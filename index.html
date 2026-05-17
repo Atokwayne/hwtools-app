@@ -802,7 +802,7 @@ function bind(){
   document.querySelectorAll('[data-dcust]').forEach(el=>el.addEventListener('click',()=>{if(confirm('Hapus customer?')){S.customers=S.customers.filter(x=>x.id!==el.dataset.dcust);save();render();}}));
   document.querySelectorAll('[data-dexp]').forEach(el=>el.addEventListener('click',()=>{if(confirm('Hapus biaya ini?')){S.expenses=S.expenses.filter(x=>x.id!==el.dataset.dexp);save();render();}}));
   document.querySelectorAll('[data-dret]').forEach(el=>el.addEventListener('click',()=>{if(confirm('Hapus retur ini?')){S.returns=S.returns.filter(x=>x.id!==el.dataset.dret);save();render();}}));
-  document.querySelectorAll('[data-ret-stok]').forEach(el=>el.addEventListener('click',()=>{S.returns=S.returns.map(x=>x.id===el.dataset.retStok?{...x,stokMasuk:true}:x);save();render();toast('Stok dikonfirmasi masuk kembali');}}));
+  document.querySelectorAll('[data-ret-stok]').forEach(el=>el.addEventListener('click',()=>{S.returns=S.returns.map(x=>x.id===el.dataset.retStok?{...x,stokMasuk:true}:x);save();render();toast('Stok dikonfirmasi masuk kembali');}));
   // modal overlay close
   document.getElementById('mOv')?.addEventListener('click',e=>{if(e.target.id==='mOv'){S.modal=null;render();}});
   // export/import
