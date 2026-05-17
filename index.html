@@ -3,17 +3,20 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HW Tools v2 — Inventaris & Penjualan</title>
+<title>HW Tools v2.1 — Inventaris, Penjualan & Keuangan</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Segoe UI',system-ui,sans-serif;background:#F5F6FA;color:#1C2333;font-size:14px}
-:root{--nav:210px;--acc:#185FA5;--accl:#E6F1FB;--ok:#3B6D11;--okl:#EAF3DE;--err:#A32D2D;--errl:#FCEBEB;--warn:#854F0B;--warnl:#FAEEDA;--bd:#E2E6EF;--t2:#6B7280;--t3:#9CA3AF;--bg2:#fff;--bg3:#F5F6FA}
+:root{--nav:215px;--acc:#185FA5;--accl:#E6F1FB;--ok:#3B6D11;--okl:#EAF3DE;--err:#A32D2D;--errl:#FCEBEB;--warn:#854F0B;--warnl:#FAEEDA;--bd:#E2E6EF;--t2:#6B7280;--t3:#9CA3AF}
 .layout{display:flex;min-height:100vh}
 .sidebar{width:var(--nav);background:#fff;border-right:1px solid var(--bd);position:fixed;top:0;left:0;height:100vh;display:flex;flex-direction:column;z-index:10;overflow-y:auto}
-.logo{padding:16px;border-bottom:1px solid var(--bd)}.logo h1{font-size:14px;font-weight:700;color:#1C2333}.logo p{font-size:10px;color:var(--t2);margin-top:2px}
+.logo{padding:15px;border-bottom:1px solid var(--bd)}.logo h1{font-size:14px;font-weight:700}.logo p{font-size:10px;color:var(--t2);margin-top:2px}
 .nl{font-size:10px;font-weight:700;color:var(--t3);padding:8px 14px 3px;letter-spacing:.06em;text-transform:uppercase}
-.ni{display:flex;align-items:center;gap:8px;padding:8px 14px;cursor:pointer;font-size:13px;color:var(--t2);border-left:2px solid transparent;transition:all .15s}
+.ni{display:flex;align-items:center;gap:8px;padding:8px 14px;cursor:pointer;font-size:12px;color:var(--t2);border-left:2px solid transparent;transition:all .15s}
 .ni:hover{background:#F5F6FA;color:#1C2333}.ni.active{color:var(--acc);background:var(--accl);border-left-color:var(--acc);font-weight:600}
 .ni i{font-size:16px;width:18px;flex-shrink:0}
 .main{margin-left:var(--nav);flex:1;min-width:0}
@@ -28,7 +31,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#F5F6FA;color:#1C233
 .card-t{font-size:11px;font-weight:700;margin-bottom:12px;color:var(--t2);text-transform:uppercase;letter-spacing:.05em}
 .mg{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:18px}
 .met{background:#fff;border:1px solid var(--bd);border-radius:9px;padding:14px}
-.ml{font-size:11px;color:var(--t2);margin-bottom:5px;font-weight:500}.mv{font-size:18px;font-weight:700}.ms{font-size:11px;color:var(--t3);margin-top:3px}
+.ml{font-size:11px;color:var(--t2);margin-bottom:5px;font-weight:500}.mv{font-size:17px;font-weight:700}.ms{font-size:11px;color:var(--t3);margin-top:3px}
 .g{color:var(--ok)}.r{color:var(--err)}.b{color:var(--acc)}.o{color:var(--warn)}
 table{width:100%;border-collapse:collapse;font-size:12px}
 th{text-align:left;padding:9px 11px;font-size:10px;font-weight:700;color:var(--t2);border-bottom:1px solid var(--bd);white-space:nowrap;text-transform:uppercase;letter-spacing:.04em;background:#FAFBFC}
@@ -42,7 +45,7 @@ input[type=checkbox]{width:auto;cursor:pointer}
 label{font-size:11px;color:var(--t2);margin-bottom:4px;display:block;font-weight:600}
 .ov{position:fixed;inset:0;background:rgba(0,0,0,.48);z-index:100;display:flex;align-items:center;justify-content:center;padding:16px}
 .modal{background:#fff;border-radius:12px;width:100%;max-width:680px;max-height:94vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.2)}
-.modal-lg{max-width:820px}
+.modal-lg{max-width:880px}
 .mh{padding:16px 20px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#fff;z-index:1}
 .mh h3{font-size:14px;font-weight:700}.mb{padding:20px}.mf{padding:13px 20px;border-top:1px solid var(--bd);display:flex;justify-content:flex-end;gap:8px;position:sticky;bottom:0;background:#fff}
 .fb{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center}.fb input,.fb select{width:auto;min-width:140px}
@@ -58,99 +61,136 @@ label{font-size:11px;color:var(--t2);margin-bottom:4px;display:block;font-weight
 .toast{position:fixed;bottom:22px;right:22px;background:#1C2333;color:#fff;padding:11px 16px;border-radius:9px;font-size:12px;z-index:999;animation:su .25s;box-shadow:0 8px 24px rgba(0,0,0,.2)}
 @keyframes su{from{transform:translateY(14px);opacity:0}to{transform:translateY(0);opacity:1}}
 .nw{white-space:nowrap}.rt{text-align:right}.tm{color:var(--t2)}.divider{height:1px;background:var(--bd);margin:12px 0}
-.tag{padding:2px 7px;border-radius:4px;font-size:10px;font-weight:600}
-.tab-bar{display:flex;border-bottom:1px solid var(--bd);margin-bottom:16px}
-.tab{padding:8px 14px;cursor:pointer;font-size:12px;color:var(--t2);border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s}
-.tab.active{color:var(--acc);border-bottom-color:var(--acc);font-weight:600}
-.sku-line{display:grid;grid-template-columns:1fr 120px 100px 90px 90px 100px 36px;gap:6px;align-items:center;padding:8px;border:1px solid var(--bd);border-radius:7px;margin-bottom:6px;background:#FAFBFC}
-.sku-line:hover{background:#F0F2F7}
-.bar-wrap{display:flex;align-items:flex-end;gap:3px;height:110px}
-.bg3{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px}
-.bw{display:flex;align-items:flex-end;gap:1px;height:96px}
-.bar{border-radius:2px 2px 0 0;min-height:2px}
-.bl{font-size:9px;color:var(--t3);margin-top:2px}
 .pay-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:5px;font-size:10px;font-weight:600}
 .outstanding{background:var(--errl);color:var(--err)}.paid{background:var(--okl);color:var(--ok)}.partial{background:var(--warnl);color:var(--warn)}
+.tertahan{background:var(--warnl);color:var(--warn)}.cair{background:var(--okl);color:var(--ok)}
+.bar-wrap{display:flex;align-items:flex-end;gap:3px;height:110px}
+.bg3{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px}
+.bw{display:flex;align-items:flex-end;gap:1px;height:96px}.bar{border-radius:2px 2px 0 0;min-height:2px}
+.bl{font-size:9px;color:var(--t3);margin-top:2px}
+.sku-line{display:grid;gap:6px;align-items:center;padding:8px;border:1px solid var(--bd);border-radius:7px;margin-bottom:6px;background:#FAFBFC}
+.tabs{display:flex;border-bottom:1px solid var(--bd);margin-bottom:16px}
+.tab{padding:8px 14px;cursor:pointer;font-size:12px;color:var(--t2);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab.active{color:var(--acc);border-bottom-color:var(--acc);font-weight:600}
+.lr-row{display:flex;justify-content:space-between;padding:8px 12px;font-size:13px;border-bottom:1px solid #F0F2F7}
+.lr-row.head{background:#FAFBFC;font-weight:700;font-size:11px;text-transform:uppercase;color:var(--t2)}
+.lr-row.total{font-weight:700;background:#FAFBFC;border-top:2px solid var(--bd)}
+.lr-row.sub{padding-left:24px;color:var(--t2)}
 </style>
 </head>
 <body><div id="app"></div>
 <script>
+// ═══ CONSTANTS ═══
 const BRANDS=['Sellery','Ranger Germany','Castrix','Blickle','Prohex','Crossman','King Tony','Elora','Truecraft','Force','Jason','Kondo','KTC','Matsu','Tekiro','Kukko','Toyoda','Zeki','ETC'];
+const CURRENCIES=['IDR','RMB','USD'];
 const PAY_METHODS=['Cash','Transfer Bank','QRIS','EDC'];
 const EXPENSE_CATS=['Biaya Kirim','Biaya Operasional','Biaya Pemasaran','Biaya Lain-lain'];
 const MO=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
-const KEY='hwtools-v2';
+const KEY='hwtools-v21';
 const fmt=n=>new Intl.NumberFormat('id-ID').format(Math.round(n||0));
+const fmt2=n=>new Intl.NumberFormat('id-ID',{minimumFractionDigits:2,maximumFractionDigits:2}).format(n||0);
 const rp=n=>'Rp '+fmt(n);
+const cur=(n,c)=>(c||'IDR')+' '+fmt2(n);
 const pct=n=>((n||0)*100).toFixed(1)+'%';
 const fd=d=>d?new Date(d).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'}):'';
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2);
 const today=()=>new Date().toISOString().slice(0,10);
 
 let S={
-  page:'dashboard',modal:null,tab:'',
-  products:[],stockIn:[],stockOut:[],
-  suppliers:[],customers:[],
-  expenses:[],returns:[],
+  page:'dashboard',modal:null,
+  products:[],purchases:[],sales:[],
+  suppliers:[],customers:[],expenses:[],returns:[],purchaseOrders:[],
   fb:'',fp:'monthly',fy:new Date().getFullYear(),fm:new Date().getMonth(),q:'',
 };
 
 function load(){
   try{const d=localStorage.getItem(KEY);if(d){const p=JSON.parse(d);
-    ['products','stockIn','stockOut','suppliers','customers','expenses','returns'].forEach(k=>{if(p[k])S[k]=p[k];});
+    ['products','purchases','sales','suppliers','customers','expenses','returns','purchaseOrders'].forEach(k=>{if(p[k])S[k]=p[k];});
+  }}catch(e){}
+  // migrasi dari v2 lama jika ada
+  try{const old=localStorage.getItem('hwtools-v2');if(old&&!S.products.length){const p=JSON.parse(old);
+    if(p.products)S.products=p.products;
+    if(p.stockIn)S.purchases=p.stockIn.map(x=>({...x,curr:'IDR',rate:1}));
+    if(p.stockOut)S.sales=p.stockOut.map(x=>({...x,ongkir:0}));
+    if(p.suppliers)S.suppliers=p.suppliers;
+    if(p.customers)S.customers=p.customers;
+    if(p.expenses)S.expenses=p.expenses;
+    if(p.returns)S.returns=p.returns;
   }}catch(e){}
 }
 function save(){
-  try{localStorage.setItem(KEY,JSON.stringify({products:S.products,stockIn:S.stockIn,stockOut:S.stockOut,suppliers:S.suppliers,customers:S.customers,expenses:S.expenses,returns:S.returns}));}catch(e){}
+  try{localStorage.setItem(KEY,JSON.stringify({products:S.products,purchases:S.purchases,sales:S.sales,suppliers:S.suppliers,customers:S.customers,expenses:S.expenses,returns:S.returns,purchaseOrders:S.purchaseOrders}));}catch(e){}
 }
 function toast(msg,ok=true){const t=document.createElement('div');t.className='toast';t.textContent=msg;t.style.background=ok?'#1C2333':'#A32D2D';document.body.appendChild(t);setTimeout(()=>t.remove(),2500);}
 
-// ── COMPUTED ──────────────────────────────────────────
+// ═══ COMPUTED ═══
 function stats(sku){
   const p=S.products.find(x=>x.sku===sku);if(!p)return{stokBagus:0,stokKaratan:0,avg:0};
-  const tIn=S.stockIn.reduce((a,inv)=>a+(inv.items||[]).filter(x=>x.sku===sku).reduce((b,x)=>b+x.qty,0),0);
-  const tOut=S.stockOut.reduce((a,inv)=>a+(inv.items||[]).filter(x=>x.sku===sku).reduce((b,x)=>b+x.qty,0),0);
+  const tIn=S.purchases.reduce((a,inv)=>a+(inv.items||[]).filter(x=>x.sku===sku).reduce((b,x)=>b+x.qty,0),0);
+  const tOut=S.sales.reduce((a,inv)=>a+(inv.items||[]).filter(x=>x.sku===sku).reduce((b,x)=>b+x.qty,0),0);
   const tRet=S.returns.filter(x=>x.stokMasuk&&x.sku===sku).reduce((a,x)=>a+x.qty,0);
   const stokBagus=Math.max(0,(p.sb||0)+tIn-tOut+tRet);
   let q=p.sb||0,v=(p.m||0)*q;
-  S.stockIn.forEach(inv=>(inv.items||[]).filter(x=>x.sku===sku).forEach(x=>{q+=x.qty;v+=x.hn*x.qty;}));
+  S.purchases.forEach(inv=>(inv.items||[]).filter(x=>x.sku===sku).forEach(x=>{q+=x.qty;v+=(x.hnIDR||x.hn||0)*x.qty;}));
   return{stokBagus,stokKaratan:p.sk||0,avg:q>0?v/q:p.m||0};
 }
 function nilaiTotal(){return S.products.reduce((a,p)=>{const s=stats(p.sku);return a+s.stokBagus*s.avg;},0);}
-function metrics(period,yr,mo){
-  let outs=[...S.stockOut];
-  if(period==='monthly')outs=outs.filter(x=>{const d=new Date(x.tgl);return d.getFullYear()===yr&&d.getMonth()===mo;});
-  else if(period==='quarterly'){const q=Math.floor(mo/3);outs=outs.filter(x=>{const d=new Date(x.tgl);return d.getFullYear()===yr&&Math.floor(d.getMonth()/3)===q;});}
-  else if(period==='semesterly'){const s=mo<6?0:1;outs=outs.filter(x=>{const d=new Date(x.tgl);return d.getFullYear()===yr&&(d.getMonth()<6?0:1)===s;});}
-  else outs=outs.filter(x=>new Date(x.tgl).getFullYear()===yr);
-  const omz=outs.reduce((a,x)=>a+(x.neto||0),0);
-  const hpp=outs.reduce((a,x)=>a+(x.items||[]).reduce((b,i)=>b+i.hpp*i.qty,0),0);
-  const laba=omz-hpp;
+// laba per invoice penjualan
+function saleProfit(sale){
+  const hppTotal=(sale.items||[]).reduce((a,i)=>a+(i.hpp||0)*i.qty,0);
+  const gross=(sale.items||[]).reduce((a,i)=>a+i.total,0);
+  const fee=sale.fee||0, ongkir=sale.ongkir||0;
+  const neto=gross-fee;
+  const labaKotor=neto-hppTotal-ongkir;
+  return{gross,fee,ongkir,neto,hppTotal,labaKotor,margin:neto>0?labaKotor/neto:0};
+}
+function saleNeto(sale){return saleProfit(sale).neto;}
+function metricsPenjualan(period,yr,mo){
+  let outs=[...S.sales];
+  const inP=d=>{const dt=new Date(d);
+    if(period==='monthly')return dt.getFullYear()===yr&&dt.getMonth()===mo;
+    if(period==='quarterly')return dt.getFullYear()===yr&&Math.floor(dt.getMonth()/3)===Math.floor(mo/3);
+    if(period==='semesterly')return dt.getFullYear()===yr&&(dt.getMonth()<6?0:1)===(mo<6?0:1);
+    return dt.getFullYear()===yr;
+  };
+  outs=outs.filter(x=>inP(x.tgl));
+  let omz=0,hpp=0,laba=0;
+  outs.forEach(s=>{const pr=saleProfit(s);omz+=pr.neto;hpp+=pr.hppTotal;laba+=pr.labaKotor;});
   return{omz,hpp,laba,mp:omz>0?laba/omz:0,trx:outs.length};
 }
-function getOutstandingTotal(){
-  return S.stockOut.filter(x=>x.payStatus!=='paid').reduce((a,x)=>{
-    const paid=(x.payments||[]).reduce((b,p)=>b+p.amount,0);
-    return a+(x.neto-paid);
+function getPiutangTotal(){
+  return S.sales.filter(x=>x.payStatus!=='paid').reduce((a,x)=>{
+    const paid=(x.payments||[]).reduce((b,p)=>b+(p.amountIDR||p.amount),0);
+    return a+(saleNeto(x)-paid);
   },0);
 }
-function getCustomerOutstanding(custId){
-  return S.stockOut.filter(x=>x.custId===custId&&x.payStatus!=='paid').reduce((a,x)=>{
-    const paid=(x.payments||[]).reduce((b,p)=>b+p.amount,0);
-    return a+(x.neto-paid);
+function getCustomerPiutang(cid){
+  return S.sales.filter(x=>x.custId===cid&&x.payStatus!=='paid').reduce((a,x)=>{
+    const paid=(x.payments||[]).reduce((b,p)=>b+(p.amountIDR||p.amount),0);
+    return a+(saleNeto(x)-paid);
   },0);
 }
-
-// ── LAYOUT ────────────────────────────────────────────
-const PAGES={dashboard:'Dashboard',analisis:'Analisis Bisnis',produk:'Data Produk',stokmasuk:'Stok Masuk',stokkeluar:'Stok Keluar',rekap:'Rekap per Brand',supplier:'Database Supplier',customer:'Database Customer',piutang:'Piutang Outstanding',biaya:'Pencatatan Biaya',retur:'Retur'};
+function getUtangTotal(){
+  return S.purchases.filter(x=>x.payStatus!=='paid').reduce((a,x)=>{
+    const totalIDR=(x.items||[]).reduce((b,i)=>b+(i.totalIDR||i.total||0),0);
+    const paid=(x.payments||[]).reduce((b,p)=>b+(p.amountIDR||p.amount),0);
+    return a+(totalIDR-paid);
+  },0);
+}
+function purchaseTotalIDR(p){return (p.items||[]).reduce((a,i)=>a+(i.totalIDR||i.total||0),0);}
+function danaTertahanTotal(){
+  return S.sales.filter(x=>x.ch==='Online'&&x.danaStatus==='tertahan').reduce((a,x)=>a+saleNeto(x),0);
+}
+// ═══ LAYOUT ═══
+const PAGES={dashboard:'Dashboard',analisis:'Analisis Bisnis',labarugi:'Laporan Laba Rugi',produk:'Data Produk',po:'Purchase Order',pembelian:'Pembelian',penjualan:'Penjualan',rekap:'Rekap per Brand',retur:'Retur',piutang:'Piutang Customer',utang:'Utang Supplier',biaya:'Pencatatan Biaya',supplier:'Database Supplier',customer:'Database Customer'};
 function render(){document.getElementById('app').innerHTML=layout();bind();}
 function navI(icon,lbl,pg){return`<div class="ni${S.page===pg?' active':''}" data-nav="${pg}"><i class="ti ti-${icon}"></i>${lbl}</div>`;}
-
 function layout(){
   const HB={
     produk:`<button class="btn btn-p" id="bAddP"><i class="ti ti-plus"></i> Tambah Produk</button>`,
-    stokmasuk:`<button class="btn btn-p" id="bAddI"><i class="ti ti-plus"></i> Catat Stok Masuk</button>`,
-    stokkeluar:`<button class="btn btn-p" id="bAddO"><i class="ti ti-plus"></i> Catat Penjualan</button>`,
+    po:`<button class="btn btn-p" id="bAddPO"><i class="ti ti-plus"></i> Buat PO</button>`,
+    pembelian:`<button class="btn btn-p" id="bAddBuy"><i class="ti ti-plus"></i> Catat Pembelian</button>`,
+    penjualan:`<button class="btn btn-p" id="bAddSell"><i class="ti ti-plus"></i> Catat Penjualan</button>`,
     supplier:`<button class="btn btn-p" id="bAddSup"><i class="ti ti-plus"></i> Tambah Supplier</button>`,
     customer:`<button class="btn btn-p" id="bAddCust"><i class="ti ti-plus"></i> Tambah Customer</button>`,
     biaya:`<button class="btn btn-p" id="bAddExp"><i class="ti ti-plus"></i> Catat Biaya</button>`,
@@ -158,23 +198,28 @@ function layout(){
   };
   return`<div class="layout">
   <div class="sidebar">
-    <div class="logo"><h1>HW Tools</h1><p>Inventaris &amp; Penjualan v2</p></div>
+    <div class="logo"><h1>HW Tools</h1><p>Inventaris, Penjualan &amp; Keuangan v2.1</p></div>
     <div style="padding:6px 0;flex:1;overflow-y:auto">
       <div class="nl">Utama</div>
       ${navI('dashboard','Dashboard','dashboard')}
       ${navI('chart-bar','Analisis Bisnis','analisis')}
+      ${navI('report-money','Laba Rugi','labarugi')}
       <div class="nl">Inventaris</div>
       ${navI('package','Data Produk','produk')}
-      ${navI('arrow-bar-to-down','Stok Masuk','stokmasuk')}
-      ${navI('arrow-bar-up','Stok Keluar','stokkeluar')}
+      ${navI('rekap','Rekap per Brand','rekap')}
       ${navI('refresh','Retur','retur')}
+      <div class="nl">Pembelian</div>
+      ${navI('file-text','Purchase Order','po')}
+      ${navI('arrow-bar-to-down','Pembelian','pembelian')}
+      ${navI('building-warehouse','Utang Supplier','utang')}
+      <div class="nl">Penjualan</div>
+      ${navI('arrow-bar-up','Penjualan','penjualan')}
+      ${navI('credit-card','Piutang Customer','piutang')}
       <div class="nl">Keuangan</div>
-      ${navI('credit-card','Piutang','piutang')}
       ${navI('receipt','Biaya','biaya')}
       <div class="nl">Database</div>
       ${navI('truck','Supplier','supplier')}
       ${navI('users','Customer','customer')}
-      ${navI('list-details','Rekap Brand','rekap')}
     </div>
     <div style="padding:12px;border-top:1px solid var(--bd)">
       <button class="btn btn-sm" style="width:100%;justify-content:center;margin-bottom:6px" id="bExp"><i class="ti ti-download"></i> Export Data</button>
@@ -187,112 +232,77 @@ function layout(){
   </div>
   </div>${S.modal?modal():''}`;
 }
-
 function page(){
-  const pg=S.page;
-  if(pg==='dashboard')return pgDash();
-  if(pg==='analisis')return pgAn();
-  if(pg==='produk')return pgProd();
-  if(pg==='stokmasuk')return pgIn();
-  if(pg==='stokkeluar')return pgOut();
-  if(pg==='rekap')return pgRekap();
-  if(pg==='supplier')return pgSup();
-  if(pg==='customer')return pgCust();
-  if(pg==='piutang')return pgPiutang();
-  if(pg==='biaya')return pgBiaya();
-  if(pg==='retur')return pgRetur();
-  return'';
+  const m={dashboard:pgDash,analisis:pgAn,labarugi:pgLR,produk:pgProd,po:pgPO,pembelian:pgBuy,penjualan:pgSell,rekap:pgRekap,retur:pgRetur,piutang:pgPiutang,utang:pgUtang,biaya:pgBiaya,supplier:pgSup,customer:pgCust};
+  return (m[S.page]||(()=>''))();
 }
 
-// ── DASHBOARD ─────────────────────────────────────────
+// ═══ DASHBOARD ═══
 function pgDash(){
-  const now=new Date(),m=metrics('monthly',now.getFullYear(),now.getMonth()),y=metrics('yearly',now.getFullYear(),now.getMonth());
+  const now=new Date(),m=metricsPenjualan('monthly',now.getFullYear(),now.getMonth()),y=metricsPenjualan('yearly',now.getFullYear(),now.getMonth());
   const ns=nilaiTotal(),sk=S.products.length,st=S.products.reduce((a,p)=>a+stats(p.sku).stokBagus,0);
-  const piutang=getOutstandingTotal();
+  const piutang=getPiutangTotal(),utang=getUtangTotal(),tertahan=danaTertahanTotal();
   return`
   <div class="mg">
     <div class="met"><div class="ml">Omzet Bulan Ini</div><div class="mv b">${rp(m.omz)}</div><div class="ms">${m.trx} transaksi</div></div>
     <div class="met"><div class="ml">Laba Kotor Bulan Ini</div><div class="mv ${m.laba>=0?'g':'r'}">${rp(m.laba)}</div><div class="ms">${pct(m.mp)} margin</div></div>
-    <div class="met"><div class="ml">Omzet Tahun Ini</div><div class="mv b">${rp(y.omz)}</div><div class="ms">${y.trx} transaksi</div></div>
     <div class="met"><div class="ml">Nilai Stok (Modal)</div><div class="mv o">${rp(ns)}</div><div class="ms">${fmt(st)} pcs · ${sk} SKU</div></div>
-    <div class="met"><div class="ml">Piutang Outstanding</div><div class="mv r">${rp(piutang)}</div><div class="ms">${S.stockOut.filter(x=>x.payStatus!=='paid').length} invoice belum lunas</div></div>
+    <div class="met"><div class="ml">Piutang Customer</div><div class="mv r">${rp(piutang)}</div><div class="ms">belum dibayar</div></div>
+    <div class="met"><div class="ml">Utang Supplier</div><div class="mv r">${rp(utang)}</div><div class="ms">belum dibayar</div></div>
+    <div class="met"><div class="ml">Dana Tertahan Marketplace</div><div class="mv o">${rp(tertahan)}</div><div class="ms">belum cair</div></div>
   </div>
   <div class="two">
     <div class="card"><div class="card-t">Penjualan Terbaru</div>
-    ${!S.stockOut.length?`<div class="empty"><i class="ti ti-receipt-off"></i><p>Belum ada data</p></div>`:`
+    ${!S.sales.length?`<div class="empty"><i class="ti ti-receipt-off"></i><p>Belum ada data</p></div>`:`
     <table><thead><tr><th>Tgl</th><th>Invoice</th><th>Customer</th><th class="rt">Neto</th><th>Status</th></tr></thead><tbody>
-    ${[...S.stockOut].reverse().slice(0,7).map(x=>{
+    ${[...S.sales].reverse().slice(0,7).map(x=>{
       const cust=S.customers.find(c=>c.id===x.custId);
-      const paid=(x.payments||[]).reduce((a,p)=>a+p.amount,0);
-      const status=paid>=x.neto?'paid':paid>0?'partial':'outstanding';
+      const paid=(x.payments||[]).reduce((a,p)=>a+(p.amountIDR||p.amount),0);
+      const st=paid>=saleNeto(x)?'paid':paid>0?'partial':'outstanding';
       return`<tr><td class="nw">${fd(x.tgl)}</td><td><span class="chip">${x.inv||'—'}</span></td>
-        <td>${cust?cust.nama:'—'}</td><td class="rt">${rp(x.neto)}</td>
-        <td><span class="pay-badge ${status}">${status==='paid'?'Lunas':status==='partial'?'Sebagian':'Belum'}</span></td></tr>`;
+        <td>${cust?cust.nama:'—'}</td><td class="rt">${rp(saleNeto(x))}</td>
+        <td><span class="pay-badge ${st}">${st==='paid'?'Lunas':st==='partial'?'Sebagian':'Belum'}</span></td></tr>`;
     }).join('')}</tbody></table>`}
     </div>
-    <div class="card"><div class="card-t">Stok Masuk Terbaru</div>
-    ${!S.stockIn.length?`<div class="empty"><i class="ti ti-package-off"></i><p>Belum ada data</p></div>`:`
-    <table><thead><tr><th>Tgl</th><th>Invoice</th><th>Supplier</th><th class="rt">Item</th><th class="rt">Total</th></tr></thead><tbody>
-    ${[...S.stockIn].reverse().slice(0,7).map(x=>{
+    <div class="card"><div class="card-t">Pembelian Terbaru</div>
+    ${!S.purchases.length?`<div class="empty"><i class="ti ti-package-off"></i><p>Belum ada data</p></div>`:`
+    <table><thead><tr><th>Tgl</th><th>Invoice</th><th>Supplier</th><th class="rt">Total (IDR)</th></tr></thead><tbody>
+    ${[...S.purchases].reverse().slice(0,7).map(x=>{
       const sup=S.suppliers.find(s=>s.id===x.supId);
-      const total=(x.items||[]).reduce((a,i)=>a+i.total,0);
       return`<tr><td class="nw">${fd(x.tgl)}</td><td><span class="chip">${x.inv||'—'}</span></td>
-        <td>${sup?sup.nama:'—'}</td><td class="rt">${(x.items||[]).length}</td><td class="rt">${rp(total)}</td></tr>`;
+        <td>${sup?sup.nama:'—'}</td><td class="rt">${rp(purchaseTotalIDR(x))}</td></tr>`;
     }).join('')}</tbody></table>`}
-    </div>
-  </div>
-  <div class="two">
-    <div class="card"><div class="card-t">Piutang Terbesar</div>
-    ${!S.customers.length?`<div class="empty"><i class="ti ti-user-off"></i><p>Belum ada customer</p></div>`:`
-    <table><thead><tr><th>Customer</th><th class="rt">Outstanding</th></tr></thead><tbody>
-    ${S.customers.map(c=>({c,o:getCustomerOutstanding(c.id)})).filter(x=>x.o>0).sort((a,b)=>b.o-a.o).slice(0,5).map(({c,o})=>`<tr>
-      <td>${c.nama}</td><td class="rt r"><strong>${rp(o)}</strong></td></tr>`).join('')||`<tr><td colspan="2"><div class="empty" style="padding:16px"><p>Tidak ada piutang outstanding</p></div></td></tr>`}
-    </tbody></table>`}
-    </div>
-    <div class="card"><div class="card-t">Biaya Bulan Ini</div>
-    ${(()=>{
-      const now=new Date();
-      const bln=S.expenses.filter(x=>{const d=new Date(x.tgl);return d.getFullYear()===now.getFullYear()&&d.getMonth()===now.getMonth();});
-      const total=bln.reduce((a,x)=>a+x.jumlah,0);
-      if(!bln.length)return`<div class="empty"><i class="ti ti-receipt-off"></i><p>Belum ada biaya dicatat</p></div>`;
-      return`<div class="met" style="margin-bottom:10px"><div class="ml">Total Biaya Bulan Ini</div><div class="mv r">${rp(total)}</div></div>
-      <table><thead><tr><th>Kategori</th><th class="rt">Jumlah</th></tr></thead><tbody>
-      ${EXPENSE_CATS.map(cat=>{const t=bln.filter(x=>x.cat===cat).reduce((a,x)=>a+x.jumlah,0);return t?`<tr><td>${cat}</td><td class="rt">${rp(t)}</td></tr>`:''}).join('')}
-      </tbody></table>`;
-    })()}
     </div>
   </div>`;
 }
-
-// ── ANALISIS ──────────────────────────────────────────
+// ═══ ANALISIS ═══
 function pgAn(){
-  const yrs=[...new Set(S.stockOut.map(x=>new Date(x.tgl).getFullYear()))];
+  const yrs=[...new Set(S.sales.map(x=>new Date(x.tgl).getFullYear()))];
   if(!yrs.includes(S.fy))yrs.push(S.fy);yrs.sort((a,b)=>b-a);
-  const m=metrics(S.fp,S.fy,S.fm);
-  const mon=Array.from({length:12},(_,i)=>metrics('monthly',S.fy,i));
+  const m=metricsPenjualan(S.fp,S.fy,S.fm);
+  const mon=Array.from({length:12},(_,i)=>metricsPenjualan('monthly',S.fy,i));
   const maxO=Math.max(...mon.map(x=>x.omz),1);
-  const expTotal=S.expenses.filter(x=>new Date(x.tgl).getFullYear()===S.fy).reduce((a,x)=>a+x.jumlah,0);
   const bData=BRANDS.map(b=>{
-    let outs=S.stockOut.filter(x=>x.brand===b||(x.items||[]).some(i=>S.products.find(p=>p.sku===i.sku&&p.brand===b)));
-    if(S.fp==='monthly')outs=outs.filter(x=>{const d=new Date(x.tgl);return d.getFullYear()===S.fy&&d.getMonth()===S.fm;});
-    else if(S.fp==='yearly')outs=outs.filter(x=>new Date(x.tgl).getFullYear()===S.fy);
-    const o=outs.reduce((a,x)=>a+(x.items||[]).filter(i=>S.products.find(p=>p.sku===i.sku&&p.brand===b)).reduce((b2,i)=>b2+i.qty*i.hj,0),0);
-    const laba=outs.reduce((a,x)=>a+(x.items||[]).filter(i=>S.products.find(p=>p.sku===i.sku&&p.brand===b)).reduce((b2,i)=>b2+(i.qty*i.hj-i.hpp*i.qty),0),0);
-    return{b,o,laba,trx:outs.length};
+    let outs=S.sales.filter(x=>{const d=new Date(x.tgl);
+      if(S.fp==='monthly')return d.getFullYear()===S.fy&&d.getMonth()===S.fm;
+      if(S.fp==='yearly')return d.getFullYear()===S.fy;
+      return d.getFullYear()===S.fy;});
+    let o=0,laba=0;
+    outs.forEach(s=>(s.items||[]).filter(i=>S.products.find(p=>p.sku===i.sku&&p.brand===b)).forEach(i=>{o+=i.total;laba+=(i.total-i.hpp*i.qty);}));
+    return{b,o,laba};
   }).filter(x=>x.o>0).sort((a,b)=>b.o-a.o);
   const tO=bData.reduce((a,x)=>a+x.o,0)||1;
   return`
   <div class="fb">
     <select id="sFp">${['monthly','quarterly','semesterly','yearly'].map(v=>`<option value="${v}" ${S.fp===v?'selected':''}>${{monthly:'Bulanan',quarterly:'Kuartalan',semesterly:'Semesteran',yearly:'Tahunan'}[v]}</option>`).join('')}</select>
     <select id="sFy">${yrs.map(y=>`<option value="${y}" ${S.fy==y?'selected':''}>${y}</option>`).join('')}</select>
-    ${S.fp==='monthly'?`<select id="sFm">${MO.map((m,i)=>`<option value="${i}" ${S.fm==i?'selected':''}>${m}</option>`).join('')}</select>`:''}
+    ${S.fp==='monthly'?`<select id="sFm">${MO.map((mm,i)=>`<option value="${i}" ${S.fm==i?'selected':''}>${mm}</option>`).join('')}</select>`:''}
   </div>
   <div class="mg">
     <div class="met"><div class="ml">Omzet</div><div class="mv b">${rp(m.omz)}</div></div>
     <div class="met"><div class="ml">HPP</div><div class="mv o">${rp(m.hpp)}</div></div>
     <div class="met"><div class="ml">Laba Kotor</div><div class="mv ${m.laba>=0?'g':'r'}">${rp(m.laba)}</div></div>
     <div class="met"><div class="ml">Margin</div><div class="mv ${m.mp>=.2?'g':m.mp>=.1?'o':'r'}">${pct(m.mp)}</div></div>
-    <div class="met"><div class="ml">Total Biaya ${S.fy}</div><div class="mv r">${rp(expTotal)}</div></div>
   </div>
   <div class="card"><div class="card-t">Omzet &amp; Laba Bulanan ${S.fy}</div>
   <div class="bar-wrap">
@@ -306,16 +316,61 @@ function pgAn(){
   </div></div>
   <div class="card"><div class="card-t">Kontribusi per Brand</div>
   ${!bData.length?`<div class="empty"><i class="ti ti-chart-bar-off"></i><p>Belum ada data</p></div>`:
-  bData.map(({b,o,laba,trx})=>{const p=o/tO;return`<div style="margin-bottom:12px">
+  bData.map(({b,o,laba})=>{const p=o/tO;return`<div style="margin-bottom:12px">
     <div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-weight:600;font-size:12px">${b}</span>
-    <span style="font-size:11px;color:var(--t2)">${rp(o)} · <span class="${laba>=0?'g':'r'}">${rp(laba)}</span> · ${trx} trx</span></div>
+    <span style="font-size:11px;color:var(--t2)">${rp(o)} · <span class="${laba>=0?'g':'r'}">${rp(laba)}</span></span></div>
     <div class="pb"><div class="pbf" style="width:${(p*100).toFixed(1)}%"></div></div>
-    <div style="font-size:10px;color:var(--t3);margin-top:2px">${(p*100).toFixed(1)}% omzet</div>
   </div>`;}).join('')}
   </div>`;
 }
 
-// ── DATA PRODUK ───────────────────────────────────────
+// ═══ LAPORAN LABA RUGI ═══
+function pgLR(){
+  const yrs=[...new Set([...S.sales,...S.expenses].map(x=>new Date(x.tgl).getFullYear()))];
+  if(!yrs.includes(S.fy))yrs.push(S.fy);yrs.sort((a,b)=>b-a);
+  const m=metricsPenjualan(S.fp,S.fy,S.fm);
+  const inP=d=>{const dt=new Date(d);
+    if(S.fp==='monthly')return dt.getFullYear()===S.fy&&dt.getMonth()===S.fm;
+    if(S.fp==='quarterly')return dt.getFullYear()===S.fy&&Math.floor(dt.getMonth()/3)===Math.floor(S.fm/3);
+    if(S.fp==='semesterly')return dt.getFullYear()===S.fy&&(dt.getMonth()<6?0:1)===(S.fm<6?0:1);
+    return dt.getFullYear()===S.fy;
+  };
+  const expP=S.expenses.filter(x=>inP(x.tgl));
+  const expByCat={};EXPENSE_CATS.forEach(c=>expByCat[c]=expP.filter(x=>x.cat===c).reduce((a,x)=>a+x.jumlah,0));
+  const totalBiaya=expP.reduce((a,x)=>a+x.jumlah,0);
+  const labaBersih=m.laba-totalBiaya;
+  const salesP=S.sales.filter(x=>inP(x.tgl));
+  return`
+  <div class="fb">
+    <select id="sFp">${['monthly','quarterly','semesterly','yearly'].map(v=>`<option value="${v}" ${S.fp===v?'selected':''}>${{monthly:'Bulanan',quarterly:'Kuartalan',semesterly:'Semesteran',yearly:'Tahunan'}[v]}</option>`).join('')}</select>
+    <select id="sFy">${yrs.map(y=>`<option value="${y}" ${S.fy==y?'selected':''}>${y}</option>`).join('')}</select>
+    ${S.fp==='monthly'?`<select id="sFm">${MO.map((mm,i)=>`<option value="${i}" ${S.fm==i?'selected':''}>${mm}</option>`).join('')}</select>`:''}
+    <button class="btn" id="bExpLR"><i class="ti ti-file-spreadsheet"></i> Export Excel</button>
+  </div>
+  <div class="card" style="max-width:560px">
+    <div class="card-t">Laporan Laba Rugi — ${S.fp==='monthly'?MO[S.fm]+' ':''}${S.fy}</div>
+    <div class="lr-row head"><span>Keterangan</span><span>Jumlah</span></div>
+    <div class="lr-row"><span><strong>Pendapatan Penjualan (Neto)</strong></span><span><strong>${rp(m.omz)}</strong></span></div>
+    <div class="lr-row sub"><span>Harga Pokok Penjualan (HPP)</span><span>(${rp(m.hpp)})</span></div>
+    <div class="lr-row total"><span>Laba Kotor</span><span class="${m.laba>=0?'g':'r'}">${rp(m.laba)}</span></div>
+    <div class="lr-row head" style="margin-top:8px"><span>Biaya Operasional</span><span></span></div>
+    ${EXPENSE_CATS.map(c=>`<div class="lr-row sub"><span>${c}</span><span>(${rp(expByCat[c])})</span></div>`).join('')}
+    <div class="lr-row total"><span>Total Biaya Operasional</span><span class="r">(${rp(totalBiaya)})</span></div>
+    <div class="lr-row total" style="font-size:15px"><span>LABA BERSIH</span><span class="${labaBersih>=0?'g':'r'}">${rp(labaBersih)}</span></div>
+  </div>
+  <div class="card">
+    <div class="card-t">Laba Kotor per Invoice Penjualan</div>
+    ${!salesP.length?`<div class="empty"><i class="ti ti-receipt-off"></i><p>Belum ada penjualan periode ini</p></div>`:`
+    <div class="tw" style="border:none"><table><thead><tr><th>Tgl</th><th>Invoice</th><th>Customer</th><th class="rt">Neto</th><th class="rt">HPP</th><th class="rt">Ongkir</th><th class="rt">Laba Kotor</th><th class="rt">Margin</th></tr></thead><tbody>
+    ${salesP.map(s=>{const pr=saleProfit(s);const c=S.customers.find(x=>x.id===s.custId);
+      return`<tr><td class="nw">${fd(s.tgl)}</td><td><span class="chip">${s.inv||'—'}</span></td><td>${c?c.nama:'—'}</td>
+        <td class="rt">${rp(pr.neto)}</td><td class="rt o">${rp(pr.hppTotal)}</td><td class="rt">${rp(pr.ongkir)}</td>
+        <td class="rt ${pr.labaKotor>=0?'g':'r'}"><strong>${rp(pr.labaKotor)}</strong></td>
+        <td class="rt ${pr.margin>=.2?'g':pr.margin>=.1?'o':'r'}">${pct(pr.margin)}</td></tr>`;}).join('')}
+    </tbody></table></div>`}
+  </div>`;
+}
+// ═══ DATA PRODUK ═══
 function pgProd(){
   const fl=S.products.filter(p=>{
     if(S.fb&&p.brand!==S.fb)return false;
@@ -336,65 +391,101 @@ function pgProd(){
   </tbody></table></div>`;
 }
 
-// ── STOK MASUK ────────────────────────────────────────
-function pgIn(){
-  const fl=S.stockIn.filter(x=>{
-    if(S.fb&&!(x.items||[]).some(i=>S.products.find(p=>p.sku===i.sku&&p.brand===S.fb)))return false;
-    if(S.q&&!x.inv?.toLowerCase().includes(S.q.toLowerCase())&&!(x.items||[]).some(i=>i.sku.toLowerCase().includes(S.q.toLowerCase())||i.nama.toLowerCase().includes(S.q.toLowerCase())))return false;
-    return true;
-  });
-  return`<div class="fb"><input id="iQ" placeholder="Cari invoice / SKU..." value="${S.q}">
-    <select id="sFb"><option value="">Semua Brand</option>${BRANDS.map(b=>`<option value="${b}" ${S.fb===b?'selected':''}>${b}</option>`).join('')}</select></div>
-  <div class="tw"><table><thead><tr><th>Tanggal</th><th>Invoice</th><th>Supplier</th><th>Item SKU</th><th class="rt">Total Qty</th><th class="rt">Total Nilai</th><th></th></tr></thead><tbody>
-  ${!fl.length?`<tr><td colspan="7"><div class="empty"><i class="ti ti-package-off"></i><p>Belum ada data</p></div></td></tr>`:
+// ═══ PURCHASE ORDER ═══
+function pgPO(){
+  const fl=S.purchaseOrders.filter(x=>!S.q||x.noPO?.toLowerCase().includes(S.q.toLowerCase()));
+  return`<div class="fb"><input id="iQ" placeholder="Cari No. PO..." value="${S.q}"></div>
+  <div class="tw"><table><thead><tr><th>Tanggal</th><th>No. PO</th><th>Supplier</th><th>Mata Uang</th><th class="rt">Total</th><th>Status</th><th></th></tr></thead><tbody>
+  ${!fl.length?`<tr><td colspan="7"><div class="empty"><i class="ti ti-file-off"></i><p>Belum ada PO</p></div></td></tr>`:
   [...fl].reverse().map(x=>{
     const sup=S.suppliers.find(s=>s.id===x.supId);
-    const totalQty=(x.items||[]).reduce((a,i)=>a+i.qty,0);
-    const totalVal=(x.items||[]).reduce((a,i)=>a+i.total,0);
+    const total=(x.items||[]).reduce((a,i)=>a+i.total,0);
+    const stMap={draft:['bx','Draft'],sent:['bb','Terkirim'],received:['bg2','Diterima'],cancelled:['br','Dibatalkan']};
+    const st=stMap[x.status]||stMap.draft;
     return`<tr>
-      <td class="nw">${fd(x.tgl)}</td><td><span class="chip">${x.inv||'—'}</span></td>
-      <td>${sup?sup.nama:'—'}</td>
-      <td style="max-width:200px">${(x.items||[]).map(i=>`<span class="chip" style="margin:1px">${i.sku}</span>`).join('')}</td>
-      <td class="rt">${fmt(totalQty)}</td><td class="rt"><strong>${rp(totalVal)}</strong></td>
-      <td><button class="btn btn-ic btn-sm btn-d" data-di="${x.id}"><i class="ti ti-trash"></i></button></td>
-    </tr>`;
-  }).join('')}
-  </tbody></table></div>`;
-}
-
-// ── STOK KELUAR ───────────────────────────────────────
-function pgOut(){
-  const fl=S.stockOut.filter(x=>{
-    if(S.q&&!x.inv?.toLowerCase().includes(S.q.toLowerCase())&&!(x.items||[]).some(i=>i.sku.toLowerCase().includes(S.q.toLowerCase())))return false;
-    return true;
-  });
-  return`<div class="fb"><input id="iQ" placeholder="Cari invoice / SKU..." value="${S.q}"></div>
-  <div class="tw"><table><thead><tr><th>Tanggal</th><th>Invoice</th><th>Customer</th><th>Channel</th><th>Item SKU</th><th class="rt">Neto</th><th class="rt">Laba</th><th>Payment</th><th></th></tr></thead><tbody>
-  ${!fl.length?`<tr><td colspan="9"><div class="empty"><i class="ti ti-receipt-off"></i><p>Belum ada data</p></div></td></tr>`:
-  [...fl].reverse().map(x=>{
-    const cust=S.customers.find(c=>c.id===x.custId);
-    const laba=(x.items||[]).reduce((a,i)=>a+(i.qty*i.hj-i.hpp*i.qty),0)-(x.fee||0);
-    const paid=(x.payments||[]).reduce((a,p)=>a+p.amount,0);
-    const status=paid>=x.neto?'paid':paid>0?'partial':'outstanding';
-    return`<tr>
-      <td class="nw">${fd(x.tgl)}</td><td><span class="chip">${x.inv||'—'}</span></td>
-      <td>${cust?cust.nama:'—'}</td>
-      <td><span class="bdg ${x.ch==='Online'?'bb':'bx'}">${x.ch}</span></td>
-      <td>${(x.items||[]).map(i=>`<span class="chip" style="margin:1px">${i.sku}</span>`).join('')}</td>
-      <td class="rt">${rp(x.neto)}</td>
-      <td class="rt ${laba>=0?'g':'r'}">${rp(laba)}</td>
-      <td><span class="pay-badge ${status}">${status==='paid'?'Lunas':status==='partial'?'Sebagian':'Belum'}</span></td>
+      <td class="nw">${fd(x.tgl)}</td><td><span class="chip">${x.noPO||'—'}</span></td>
+      <td>${sup?sup.nama:'—'}</td><td>${x.curr}${x.curr!=='IDR'?` @${fmt(x.rate)}`:''}</td>
+      <td class="rt">${cur(total,x.curr)}</td>
+      <td><span class="bdg ${st[0]}">${st[1]}</span></td>
       <td style="white-space:nowrap">
-        <button class="btn btn-ic btn-sm" data-eo="${x.id}" title="Edit"><i class="ti ti-edit"></i></button>
-        <button class="btn btn-ic btn-sm btn-ok" data-pay="${x.id}" title="Catat Pembayaran"><i class="ti ti-cash"></i></button>
-        <button class="btn btn-ic btn-sm btn-d" data-do="${x.id}"><i class="ti ti-trash"></i></button>
+        <button class="btn btn-ic btn-sm" data-epo="${x.id}" title="Edit"><i class="ti ti-edit"></i></button>
+        <button class="btn btn-ic btn-sm" data-pdfpo="${x.id}" title="PDF"><i class="ti ti-file-type-pdf"></i></button>
+        <button class="btn btn-ic btn-sm" data-xlspo="${x.id}" title="Excel"><i class="ti ti-file-spreadsheet"></i></button>
+        ${x.status!=='received'&&x.status!=='cancelled'?`<button class="btn btn-sm btn-ok" data-convpo="${x.id}" title="Konversi ke Pembelian">Terima</button>`:''}
+        <button class="btn btn-ic btn-sm btn-d" data-dpo="${x.id}"><i class="ti ti-trash"></i></button>
       </td>
     </tr>`;
   }).join('')}
   </tbody></table></div>`;
 }
 
-// ── REKAP ─────────────────────────────────────────────
+// ═══ PEMBELIAN ═══
+function pgBuy(){
+  const fl=S.purchases.filter(x=>{
+    if(S.q&&!x.inv?.toLowerCase().includes(S.q.toLowerCase())&&!(x.items||[]).some(i=>i.sku.toLowerCase().includes(S.q.toLowerCase())))return false;
+    return true;
+  });
+  return`<div class="fb"><input id="iQ" placeholder="Cari invoice / SKU..." value="${S.q}"></div>
+  <div class="tw"><table><thead><tr><th>Tanggal</th><th>Invoice</th><th>Supplier</th><th>Mata Uang</th><th>Item</th><th class="rt">Total (IDR)</th><th>Pembayaran</th><th></th></tr></thead><tbody>
+  ${!fl.length?`<tr><td colspan="8"><div class="empty"><i class="ti ti-package-off"></i><p>Belum ada data</p></div></td></tr>`:
+  [...fl].reverse().map(x=>{
+    const sup=S.suppliers.find(s=>s.id===x.supId);
+    const totalIDR=purchaseTotalIDR(x);
+    const paid=(x.payments||[]).reduce((a,p)=>a+(p.amountIDR||p.amount),0);
+    const st=paid>=totalIDR?'paid':paid>0?'partial':'outstanding';
+    return`<tr>
+      <td class="nw">${fd(x.tgl)}</td><td><span class="chip">${x.inv||'—'}</span></td>
+      <td>${sup?sup.nama:'—'}</td>
+      <td>${x.curr}${x.curr!=='IDR'?` @${fmt(x.rate)}`:''}</td>
+      <td>${(x.items||[]).map(i=>`<span class="chip" style="margin:1px">${i.sku}</span>`).join('')}</td>
+      <td class="rt"><strong>${rp(totalIDR)}</strong></td>
+      <td><span class="pay-badge ${st}">${st==='paid'?'Lunas':st==='partial'?'Sebagian':'Belum'}</span></td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-ic btn-sm" data-ebuy="${x.id}" title="Edit"><i class="ti ti-edit"></i></button>
+        <button class="btn btn-ic btn-sm btn-ok" data-paybuy="${x.id}" title="Bayar"><i class="ti ti-cash"></i></button>
+        <button class="btn btn-ic btn-sm btn-d" data-dbuy="${x.id}"><i class="ti ti-trash"></i></button>
+      </td>
+    </tr>`;
+  }).join('')}
+  </tbody></table></div>`;
+}
+
+// ═══ PENJUALAN ═══
+function pgSell(){
+  const fl=S.sales.filter(x=>{
+    if(S.q&&!x.inv?.toLowerCase().includes(S.q.toLowerCase())&&!(x.items||[]).some(i=>i.sku.toLowerCase().includes(S.q.toLowerCase())))return false;
+    return true;
+  });
+  return`<div class="fb"><input id="iQ" placeholder="Cari invoice / SKU..." value="${S.q}"></div>
+  <div class="tw"><table><thead><tr><th>Tanggal</th><th>Invoice</th><th>Customer</th><th>Channel</th><th>Item</th><th class="rt">Ongkir</th><th class="rt">Neto</th><th>Payment</th><th>Dana</th><th></th></tr></thead><tbody>
+  ${!fl.length?`<tr><td colspan="10"><div class="empty"><i class="ti ti-receipt-off"></i><p>Belum ada data</p></div></td></tr>`:
+  [...fl].reverse().map(x=>{
+    const cust=S.customers.find(c=>c.id===x.custId);
+    const paid=(x.payments||[]).reduce((a,p)=>a+(p.amountIDR||p.amount),0);
+    const neto=saleNeto(x);
+    const st=paid>=neto?'paid':paid>0?'partial':'outstanding';
+    return`<tr>
+      <td class="nw">${fd(x.tgl)}</td><td><span class="chip">${x.inv||'—'}</span></td>
+      <td>${cust?cust.nama:'—'}</td>
+      <td><span class="bdg ${x.ch==='Online'?'bb':'bx'}">${x.ch}</span></td>
+      <td>${(x.items||[]).map(i=>`<span class="chip" style="margin:1px">${i.sku}</span>`).join('')}</td>
+      <td class="rt">${x.ongkir>0?rp(x.ongkir):'—'}</td>
+      <td class="rt">${rp(neto)}</td>
+      <td><span class="pay-badge ${st}">${st==='paid'?'Lunas':st==='partial'?'Sebagian':'Belum'}</span></td>
+      <td>${x.ch==='Online'?`<span class="pay-badge ${x.danaStatus==='cair'?'cair':'tertahan'}">${x.danaStatus==='cair'?'Cair':'Tertahan'}</span>`:'—'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-ic btn-sm" data-esell="${x.id}" title="Edit"><i class="ti ti-edit"></i></button>
+        <button class="btn btn-ic btn-sm btn-ok" data-paysell="${x.id}" title="Bayar"><i class="ti ti-cash"></i></button>
+        <button class="btn btn-ic btn-sm" data-pdfsell="${x.id}" title="Invoice PDF"><i class="ti ti-file-type-pdf"></i></button>
+        <button class="btn btn-ic btn-sm" data-xlssell="${x.id}" title="Excel"><i class="ti ti-file-spreadsheet"></i></button>
+        ${x.ch==='Online'&&x.danaStatus!=='cair'?`<button class="btn btn-sm btn-ok" data-cair="${x.id}" title="Tandai Dana Cair">Cair</button>`:''}
+        <button class="btn btn-ic btn-sm btn-d" data-dsell="${x.id}"><i class="ti ti-trash"></i></button>
+      </td>
+    </tr>`;
+  }).join('')}
+  </tbody></table></div>`;
+}
+// ═══ REKAP ═══
 function pgRekap(){
   const brands=S.fb?[S.fb]:BRANDS;
   const tBg=S.products.reduce((a,p)=>a+stats(p.sku).stokBagus,0);
@@ -417,8 +508,8 @@ function pgRekap(){
         ${kr>0?`<span class="r">${fmt(kr)} karatan</span>`:''}<span class="o">${rp(ni)}</span>
       </div>
     </div>
-    <div class="tw" style="border:none;border-radius:0"><table><thead><tr><th>SKU</th><th>Nama</th><th class="rt">Awal Bagus</th><th class="rt">Awal Karatan</th><th class="rt">Total Masuk</th><th class="rt">Total Keluar</th><th class="rt">Sisa Stok</th><th class="rt">Avg Modal</th><th class="rt">Nilai Stok</th></tr></thead><tbody>
-    ${ps.map(p=>{const s=stats(p.sku),tI=S.stockIn.reduce((a,inv)=>a+(inv.items||[]).filter(x=>x.sku===p.sku).reduce((b,x)=>b+x.qty,0),0),tO=S.stockOut.reduce((a,inv)=>a+(inv.items||[]).filter(x=>x.sku===p.sku).reduce((b,x)=>b+x.qty,0),0);
+    <div class="tw" style="border:none;border-radius:0"><table><thead><tr><th>SKU</th><th>Nama</th><th class="rt">Awal Bagus</th><th class="rt">Awal Karatan</th><th class="rt">Masuk</th><th class="rt">Keluar</th><th class="rt">Sisa Stok</th><th class="rt">Avg Modal</th><th class="rt">Nilai Stok</th></tr></thead><tbody>
+    ${ps.map(p=>{const s=stats(p.sku),tI=S.purchases.reduce((a,inv)=>a+(inv.items||[]).filter(x=>x.sku===p.sku).reduce((b,x)=>b+x.qty,0),0),tO=S.sales.reduce((a,inv)=>a+(inv.items||[]).filter(x=>x.sku===p.sku).reduce((b,x)=>b+x.qty,0),0);
       return`<tr><td><span class="chip">${p.sku}</span></td><td>${p.nama}</td><td class="rt">${fmt(p.sb)}</td><td class="rt ${p.sk>0?'r':''}">${fmt(p.sk)}</td>
         <td class="rt g">+${fmt(tI)}</td><td class="rt r">-${fmt(tO)}</td><td class="rt"><strong>${fmt(s.stokBagus)}</strong></td>
         <td class="rt o">${rp(s.avg)}</td><td class="rt">${rp(s.stokBagus*s.avg)}</td></tr>`;}).join('')}
@@ -426,123 +517,123 @@ function pgRekap(){
   }).join('')}`;
 }
 
-// ── SUPPLIER ──────────────────────────────────────────
-function pgSup(){
-  const fl=S.suppliers.filter(x=>!S.q||x.nama.toLowerCase().includes(S.q.toLowerCase()));
-  return`<div class="fb"><input id="iQ" placeholder="Cari nama supplier..." value="${S.q}"></div>
-  <div class="tw"><table><thead><tr><th>Nama Supplier</th><th>PIC</th><th>No. Telp</th><th>Email</th><th>Alamat</th><th class="rt">Total Transaksi</th><th></th></tr></thead><tbody>
-  ${!fl.length?`<tr><td colspan="7"><div class="empty"><i class="ti ti-truck-off"></i><p>Belum ada supplier</p></div></td></tr>`:
-  fl.map(s=>{
-    const trx=S.stockIn.filter(x=>x.supId===s.id).reduce((a,x)=>(x.items||[]).reduce((b,i)=>b+i.total,a),0);
-    return`<tr><td><strong>${s.nama}</strong></td><td>${s.pic||'—'}</td><td>${s.telp||'—'}</td><td>${s.email||'—'}</td>
-      <td style="max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.alamat||'—'}</td>
-      <td class="rt">${rp(trx)}</td>
-      <td style="white-space:nowrap"><button class="btn btn-ic btn-sm" data-esup="${s.id}"><i class="ti ti-edit"></i></button> <button class="btn btn-ic btn-sm btn-d" data-dsup="${s.id}"><i class="ti ti-trash"></i></button></td>
-    </tr>`;
-  }).join('')}
+// ═══ RETUR ═══
+function pgRetur(){
+  const fl=S.returns.filter(x=>!S.q||x.sku?.toLowerCase().includes(S.q.toLowerCase())||x.invRef?.toLowerCase().includes(S.q.toLowerCase()));
+  return`<div class="fb"><input id="iQ" placeholder="Cari SKU / invoice..." value="${S.q}"></div>
+  <div class="tw"><table><thead><tr><th>Tanggal</th><th>Tipe</th><th>SKU</th><th>Nama</th><th>Invoice Ref</th><th class="rt">Qty</th><th>Alasan</th><th>Stok Masuk?</th><th></th></tr></thead><tbody>
+  ${!fl.length?`<tr><td colspan="9"><div class="empty"><i class="ti ti-package-off"></i><p>Belum ada data retur</p></div></td></tr>`:
+  [...fl].reverse().map(x=>`<tr>
+    <td class="nw">${fd(x.tgl)}</td><td><span class="bdg ${x.tipe==='Online'?'bb':'bx'}">${x.tipe}</span></td>
+    <td><span class="chip">${x.sku}</span></td><td>${x.nama||'—'}</td>
+    <td>${x.invRef?`<span class="chip">${x.invRef}</span>`:'—'}</td>
+    <td class="rt">${fmt(x.qty)}</td><td>${x.alasan||'—'}</td>
+    <td><span class="bdg ${x.stokMasuk?'bg2':'br'}">${x.stokMasuk?'Ya':'Tidak'}</span>
+      ${!x.stokMasuk?`<button class="btn btn-sm btn-ok" style="margin-left:4px" data-retstok="${x.id}">Konfirmasi</button>`:''}</td>
+    <td><button class="btn btn-ic btn-sm btn-d" data-dret="${x.id}"><i class="ti ti-trash"></i></button></td>
+  </tr>`).join('')}
   </tbody></table></div>`;
 }
 
-// ── CUSTOMER ──────────────────────────────────────────
-function pgCust(){
-  const fl=S.customers.filter(x=>!S.q||x.nama.toLowerCase().includes(S.q.toLowerCase()));
-  return`<div class="fb"><input id="iQ" placeholder="Cari nama customer..." value="${S.q}"></div>
-  <div class="tw"><table><thead><tr><th>Nama Customer</th><th>PIC</th><th>No. Telp</th><th>Email</th><th>Tipe</th><th class="rt">Total Pembelian</th><th class="rt">Piutang</th><th></th></tr></thead><tbody>
-  ${!fl.length?`<tr><td colspan="8"><div class="empty"><i class="ti ti-users-off"></i><p>Belum ada customer</p></div></td></tr>`:
-  fl.map(c=>{
-    const trx=S.stockOut.filter(x=>x.custId===c.id).reduce((a,x)=>a+(x.neto||0),0);
-    const out=getCustomerOutstanding(c.id);
-    return`<tr><td><strong>${c.nama}</strong></td><td>${c.pic||'—'}</td><td>${c.telp||'—'}</td><td>${c.email||'—'}</td>
-      <td><span class="bdg ${c.tipe==='Corporate'?'bb':'bx'}">${c.tipe||'—'}</span></td>
-      <td class="rt">${rp(trx)}</td>
-      <td class="rt ${out>0?'r':''}">${out>0?rp(out):'—'}</td>
-      <td style="white-space:nowrap"><button class="btn btn-ic btn-sm" data-ecust="${c.id}"><i class="ti ti-edit"></i></button> <button class="btn btn-ic btn-sm btn-d" data-dcust="${c.id}"><i class="ti ti-trash"></i></button></td>
-    </tr>`;
-  }).join('')}
-  </tbody></table></div>`;
-}
-
-// ── PIUTANG ───────────────────────────────────────────
+// ═══ PIUTANG ═══
 function pgPiutang(){
-  const outstanding=S.stockOut.filter(x=>{
-    const paid=(x.payments||[]).reduce((a,p)=>a+p.amount,0);
-    return paid<x.neto;
-  });
-  const totalOut=outstanding.reduce((a,x)=>{const paid=(x.payments||[]).reduce((b,p)=>b+p.amount,0);return a+(x.neto-paid);},0);
+  const out=S.sales.filter(x=>{const paid=(x.payments||[]).reduce((a,p)=>a+(p.amountIDR||p.amount),0);return paid<saleNeto(x);});
+  const tot=out.reduce((a,x)=>{const paid=(x.payments||[]).reduce((b,p)=>b+(p.amountIDR||p.amount),0);return a+(saleNeto(x)-paid);},0);
   return`
   <div class="mg">
-    <div class="met"><div class="ml">Total Piutang Outstanding</div><div class="mv r">${rp(totalOut)}</div><div class="ms">${outstanding.length} invoice</div></div>
-    <div class="met"><div class="ml">Customer dengan Piutang</div><div class="mv">${[...new Set(outstanding.map(x=>x.custId).filter(Boolean))].length}</div></div>
+    <div class="met"><div class="ml">Total Piutang</div><div class="mv r">${rp(tot)}</div><div class="ms">${out.length} invoice</div></div>
+    <div class="met"><div class="ml">Customer dengan Piutang</div><div class="mv">${[...new Set(out.map(x=>x.custId).filter(Boolean))].length}</div></div>
   </div>
-  <div class="tw"><table><thead><tr><th>Tanggal</th><th>Invoice</th><th>Customer</th><th>Term</th><th>Jatuh Tempo</th><th class="rt">Nilai Invoice</th><th class="rt">Sudah Dibayar</th><th class="rt">Sisa</th><th>Status</th><th></th></tr></thead><tbody>
-  ${!outstanding.length?`<tr><td colspan="10"><div class="empty"><i class="ti ti-circle-check"></i><p>Tidak ada piutang outstanding</p></div></td></tr>`:
-  outstanding.map(x=>{
-    const cust=S.customers.find(c=>c.id===x.custId);
-    const paid=(x.payments||[]).reduce((a,p)=>a+p.amount,0);
-    const sisa=x.neto-paid;
-    const status=paid>0?'partial':'outstanding';
-    const jt=x.jatuhTempo?new Date(x.jatuhTempo):null;
-    const overdue=jt&&jt<new Date();
-    return`<tr>
-      <td class="nw">${fd(x.tgl)}</td><td><span class="chip">${x.inv||'—'}</span></td>
-      <td>${cust?cust.nama:'—'}</td>
-      <td>${x.payTerm==='credit'?`Credit ${x.termDays||0} hari`:'Cash'}</td>
-      <td class="${overdue?'r nw':' nw'}">${jt?fd(x.jatuhTempo)+(overdue?' ⚠':''):'—'}</td>
-      <td class="rt">${rp(x.neto)}</td><td class="rt g">${rp(paid)}</td>
+  <div class="tw"><table><thead><tr><th>Tanggal</th><th>Invoice</th><th>Customer</th><th>Term</th><th>Jatuh Tempo</th><th class="rt">Nilai</th><th class="rt">Dibayar</th><th class="rt">Sisa</th><th></th></tr></thead><tbody>
+  ${!out.length?`<tr><td colspan="9"><div class="empty"><i class="ti ti-circle-check"></i><p>Tidak ada piutang outstanding</p></div></td></tr>`:
+  out.map(x=>{
+    const c=S.customers.find(cc=>cc.id===x.custId);
+    const paid=(x.payments||[]).reduce((a,p)=>a+(p.amountIDR||p.amount),0);
+    const neto=saleNeto(x),sisa=neto-paid;
+    const jt=x.jatuhTempo?new Date(x.jatuhTempo):null,od=jt&&jt<new Date();
+    return`<tr><td class="nw">${fd(x.tgl)}</td><td><span class="chip">${x.inv||'—'}</span></td>
+      <td>${c?c.nama:'—'}</td>
+      <td>${x.payTerm==='credit'?`Credit ${x.termDays||0}h`:x.payTerm==='cod'?'COD':'Cash'}</td>
+      <td class="nw ${od?'r':''}">${jt?fd(x.jatuhTempo)+(od?' ⚠':''):'—'}</td>
+      <td class="rt">${rp(neto)}</td><td class="rt g">${rp(paid)}</td>
       <td class="rt r"><strong>${rp(sisa)}</strong></td>
-      <td><span class="pay-badge ${status}">${status==='partial'?'Sebagian':'Belum'}</span></td>
-      <td><button class="btn btn-ic btn-sm btn-ok" data-pay="${x.id}" title="Catat Pembayaran"><i class="ti ti-cash"></i></button></td>
-    </tr>`;
+      <td><button class="btn btn-ic btn-sm btn-ok" data-paysell="${x.id}"><i class="ti ti-cash"></i></button></td></tr>`;
   }).join('')}
   </tbody></table></div>`;
 }
 
-// ── BIAYA ─────────────────────────────────────────────
+// ═══ UTANG ═══
+function pgUtang(){
+  const out=S.purchases.filter(x=>{const paid=(x.payments||[]).reduce((a,p)=>a+(p.amountIDR||p.amount),0);return paid<purchaseTotalIDR(x);});
+  const tot=out.reduce((a,x)=>{const paid=(x.payments||[]).reduce((b,p)=>b+(p.amountIDR||p.amount),0);return a+(purchaseTotalIDR(x)-paid);},0);
+  return`
+  <div class="mg">
+    <div class="met"><div class="ml">Total Utang Supplier</div><div class="mv r">${rp(tot)}</div><div class="ms">${out.length} invoice</div></div>
+    <div class="met"><div class="ml">Supplier dengan Utang</div><div class="mv">${[...new Set(out.map(x=>x.supId).filter(Boolean))].length}</div></div>
+  </div>
+  <div class="tw"><table><thead><tr><th>Tanggal</th><th>Invoice</th><th>Supplier</th><th>Mata Uang</th><th class="rt">Nilai (IDR)</th><th class="rt">Dibayar</th><th class="rt">Sisa</th><th></th></tr></thead><tbody>
+  ${!out.length?`<tr><td colspan="8"><div class="empty"><i class="ti ti-circle-check"></i><p>Tidak ada utang outstanding</p></div></td></tr>`:
+  out.map(x=>{
+    const s=S.suppliers.find(ss=>ss.id===x.supId);
+    const paid=(x.payments||[]).reduce((a,p)=>a+(p.amountIDR||p.amount),0);
+    const tIDR=purchaseTotalIDR(x),sisa=tIDR-paid;
+    return`<tr><td class="nw">${fd(x.tgl)}</td><td><span class="chip">${x.inv||'—'}</span></td>
+      <td>${s?s.nama:'—'}</td><td>${x.curr}${x.curr!=='IDR'?` @${fmt(x.rate)}`:''}</td>
+      <td class="rt">${rp(tIDR)}</td><td class="rt g">${rp(paid)}</td>
+      <td class="rt r"><strong>${rp(sisa)}</strong></td>
+      <td><button class="btn btn-ic btn-sm btn-ok" data-paybuy="${x.id}"><i class="ti ti-cash"></i></button></td></tr>`;
+  }).join('')}
+  </tbody></table></div>`;
+}
+
+// ═══ BIAYA ═══
 function pgBiaya(){
   const fl=S.expenses.filter(x=>!S.q||x.deskripsi?.toLowerCase().includes(S.q.toLowerCase())||x.cat?.toLowerCase().includes(S.q.toLowerCase()));
   const total=fl.reduce((a,x)=>a+x.jumlah,0);
   return`<div class="fb"><input id="iQ" placeholder="Cari kategori / deskripsi..." value="${S.q}"></div>
   <div class="met" style="margin-bottom:14px"><div class="ml">Total Biaya (Semua)</div><div class="mv r">${rp(total)}</div></div>
   <div class="tw"><table><thead><tr><th>Tanggal</th><th>Kategori</th><th>Deskripsi</th><th>Invoice Terkait</th><th class="rt">Jumlah</th><th></th></tr></thead><tbody>
-  ${!fl.length?`<tr><td colspan="6"><div class="empty"><i class="ti ti-receipt-off"></i><p>Belum ada biaya dicatat</p></div></td></tr>`:
+  ${!fl.length?`<tr><td colspan="6"><div class="empty"><i class="ti ti-receipt-off"></i><p>Belum ada biaya</p></div></td></tr>`:
   [...fl].reverse().map(x=>`<tr>
-    <td class="nw">${fd(x.tgl)}</td>
-    <td><span class="bdg bo">${x.cat}</span></td>
-    <td>${x.deskripsi||'—'}</td>
-    <td>${x.invRef?`<span class="chip">${x.invRef}</span>`:'—'}</td>
+    <td class="nw">${fd(x.tgl)}</td><td><span class="bdg bo">${x.cat}</span></td>
+    <td>${x.deskripsi||'—'}</td><td>${x.invRef?`<span class="chip">${x.invRef}</span>`:'—'}</td>
     <td class="rt r"><strong>${rp(x.jumlah)}</strong></td>
     <td><button class="btn btn-ic btn-sm btn-d" data-dexp="${x.id}"><i class="ti ti-trash"></i></button></td>
   </tr>`).join('')}
   </tbody></table></div>`;
 }
 
-// ── RETUR ─────────────────────────────────────────────
-function pgRetur(){
-  const fl=S.returns.filter(x=>!S.q||x.sku?.toLowerCase().includes(S.q.toLowerCase())||x.invRef?.toLowerCase().includes(S.q.toLowerCase()));
-  return`<div class="fb"><input id="iQ" placeholder="Cari SKU / invoice..." value="${S.q}"></div>
-  <div class="tw"><table><thead><tr><th>Tanggal</th><th>Tipe</th><th>SKU</th><th>Nama</th><th>Invoice Ref</th><th>Channel</th><th class="rt">Qty</th><th>Alasan</th><th>Stok Masuk?</th><th></th></tr></thead><tbody>
-  ${!fl.length?`<tr><td colspan="10"><div class="empty"><i class="ti ti-package-off"></i><p>Belum ada data retur</p></div></td></tr>`:
-  [...fl].reverse().map(x=>`<tr>
-    <td class="nw">${fd(x.tgl)}</td>
-    <td><span class="bdg ${x.tipe==='Online'?'bb':'bx'}">${x.tipe}</span></td>
-    <td><span class="chip">${x.sku}</span></td>
-    <td>${x.nama||'—'}</td>
-    <td>${x.invRef?`<span class="chip">${x.invRef}</span>`:'—'}</td>
-    <td>${x.ch||'—'}</td>
-    <td class="rt">${fmt(x.qty)}</td>
-    <td>${x.alasan||'—'}</td>
-    <td><span class="bdg ${x.stokMasuk?'bg2':'br'}">${x.stokMasuk?'Ya':'Tidak'}</span>
-      ${!x.stokMasuk?`<button class="btn btn-sm btn-ok" style="margin-left:4px" data-ret-stok="${x.id}">Konfirmasi</button>`:''}</td>
-    <td><button class="btn btn-ic btn-sm btn-d" data-dret="${x.id}"><i class="ti ti-trash"></i></button></td>
+// ═══ SUPPLIER ═══
+function pgSup(){
+  const fl=S.suppliers.filter(x=>!S.q||x.nama.toLowerCase().includes(S.q.toLowerCase()));
+  return`<div class="fb"><input id="iQ" placeholder="Cari nama supplier..." value="${S.q}"></div>
+  <div class="tw"><table><thead><tr><th>Nama</th><th>PIC</th><th>No. Telp</th><th>Email</th><th>Alamat</th><th></th></tr></thead><tbody>
+  ${!fl.length?`<tr><td colspan="6"><div class="empty"><i class="ti ti-truck"></i><p>Belum ada supplier</p></div></td></tr>`:
+  fl.map(s=>`<tr><td><strong>${s.nama}</strong></td><td>${s.pic||'—'}</td><td>${s.telp||'—'}</td><td>${s.email||'—'}</td>
+    <td style="max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.alamat||'—'}</td>
+    <td style="white-space:nowrap"><button class="btn btn-ic btn-sm" data-esup="${s.id}"><i class="ti ti-edit"></i></button> <button class="btn btn-ic btn-sm btn-d" data-dsup="${s.id}"><i class="ti ti-trash"></i></button></td>
   </tr>`).join('')}
   </tbody></table></div>`;
 }
 
-// ── MODALS ────────────────────────────────────────────
+// ═══ CUSTOMER ═══
+function pgCust(){
+  const fl=S.customers.filter(x=>!S.q||x.nama.toLowerCase().includes(S.q.toLowerCase()));
+  return`<div class="fb"><input id="iQ" placeholder="Cari nama customer..." value="${S.q}"></div>
+  <div class="tw"><table><thead><tr><th>Nama</th><th>PIC</th><th>No. Telp</th><th>Email</th><th>Tipe</th><th class="rt">Piutang</th><th></th></tr></thead><tbody>
+  ${!fl.length?`<tr><td colspan="7"><div class="empty"><i class="ti ti-users"></i><p>Belum ada customer</p></div></td></tr>`:
+  fl.map(c=>{const out=getCustomerPiutang(c.id);
+    return`<tr><td><strong>${c.nama}</strong></td><td>${c.pic||'—'}</td><td>${c.telp||'—'}</td><td>${c.email||'—'}</td>
+    <td><span class="bdg ${c.tipe==='Corporate'?'bb':'bx'}">${c.tipe||'—'}</span></td>
+    <td class="rt ${out>0?'r':''}">${out>0?rp(out):'—'}</td>
+    <td style="white-space:nowrap"><button class="btn btn-ic btn-sm" data-ecust="${c.id}"><i class="ti ti-edit"></i></button> <button class="btn btn-ic btn-sm btn-d" data-dcust="${c.id}"><i class="ti ti-trash"></i></button></td>
+  </tr>`;}).join('')}
+  </tbody></table></div>`;
+}
+// ═══ MODALS ═══
 function modal(){
   const {type,data:d={}}=S.modal;
 
-  // PRODUK
   if(type==='prod')return`<div class="ov" id="mOv"><div class="modal">
     <div class="mh"><h3>${d.id?'Edit Produk':'Tambah Produk'}</h3><button class="btn btn-ic" id="bCl"><i class="ti ti-x"></i></button></div>
     <div class="mb">
@@ -558,54 +649,100 @@ function modal(){
     <div class="mf"><button class="btn" id="bCl2">Batal</button><button class="btn btn-p" id="bSvP" data-id="${d.id||''}">Simpan</button></div>
   </div></div>`;
 
-  // STOK MASUK — multi SKU
-  if(type==='in'){
+  // PURCHASE ORDER
+  if(type==='po'){
     const supOpts=S.suppliers.map(s=>`<option value="${s.id}" ${d.supId===s.id?'selected':''}>${s.nama}</option>`).join('');
-    const items=d.items||[{id:uid(),sku:'',qty:1,hl:0,disc:0,hn:0,total:0}];
+    const items=d.items||[{id:uid(),sku:'',qty:1,hargaAsli:0,total:0}];
     return`<div class="ov" id="mOv"><div class="modal modal-lg">
-    <div class="mh"><h3>Catat Stok Masuk</h3><button class="btn btn-ic" id="bCl"><i class="ti ti-x"></i></button></div>
+    <div class="mh"><h3>${d.id?'Edit Purchase Order':'Buat Purchase Order'}</h3><button class="btn btn-ic" id="bCl"><i class="ti ti-x"></i></button></div>
     <div class="mb">
-      <div class="fr c3">
+      <div class="fr c4">
         <div><label>Tanggal</label><input id="fTg" type="date" value="${d.tgl||today()}"></div>
-        <div><label>No. Invoice</label><input id="fIn" value="${d.inv||''}" placeholder="INV-001"></div>
-        <div><label>Supplier</label><select id="fSup"><option value="">— Pilih Supplier —</option>${supOpts}</select></div>
+        <div><label>No. PO</label><input id="fNoPO" value="${d.noPO||''}" placeholder="PO-001"></div>
+        <div><label>Supplier</label><select id="fSup"><option value="">— Pilih —</option>${supOpts}</select></div>
+        <div><label>Status</label><select id="fStatus">
+          <option value="draft" ${d.status==='draft'||!d.status?'selected':''}>Draft</option>
+          <option value="sent" ${d.status==='sent'?'selected':''}>Terkirim</option>
+          <option value="cancelled" ${d.status==='cancelled'?'selected':''}>Dibatalkan</option>
+        </select></div>
+      </div>
+      <div class="fr c2">
+        <div><label>Mata Uang</label><select id="fCurr">${CURRENCIES.map(c=>`<option value="${c}" ${d.curr===c?'selected':''}>${c}</option>`).join('')}</select></div>
+        <div><label>Rate ke IDR (1 unit = Rp ...)</label><input id="fRate" type="number" value="${d.rate||1}" min="0" step="0.01"></div>
       </div>
       <div class="divider"></div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <label style="margin:0">Item Produk</label>
-        <button class="btn btn-sm btn-p" id="bAddItem"><i class="ti ti-plus"></i> Tambah SKU</button>
+        <label style="margin:0">Item Pesanan</label>
+        <button class="btn btn-sm btn-p" id="bAddItemPO"><i class="ti ti-plus"></i> Tambah SKU</button>
       </div>
-      <div style="font-size:11px;color:var(--t2);display:grid;grid-template-columns:1fr 100px 90px 80px 80px 90px 36px;gap:6px;padding:0 8px;margin-bottom:4px">
-        <span>SKU / Produk</span><span>Harga List</span><span>Disc %</span><span>Harga Net</span><span>Qty</span><span>Total</span><span></span>
+      <div style="font-size:11px;color:var(--t2);display:grid;grid-template-columns:1fr 130px 90px 130px 36px;gap:6px;padding:0 8px;margin-bottom:4px">
+        <span>SKU / Produk</span><span>Harga Satuan</span><span>Qty</span><span>Total</span><span></span>
       </div>
-      <div id="itemList">
-      ${items.map((it,idx)=>skuLineIn(it,idx)).join('')}
-      </div>
+      <div id="itemListPO">${items.map((it,i)=>skuLinePO(it,i)).join('')}</div>
       <div class="sb" style="margin-top:10px">
-        <div class="row"><span>Total Nilai Stok Masuk</span><strong id="fGrandTotal">${rp(items.reduce((a,i)=>a+i.total,0))}</strong></div>
+        <div class="row"><span>Total PO</span><strong id="poGrand">—</strong></div>
+        <div class="row"><span>Estimasi dalam IDR</span><strong id="poGrandIDR">—</strong></div>
       </div>
+      <div class="fr" style="margin-top:10px"><label>Catatan (Opsional)</label><textarea id="fNote" rows="2" placeholder="Catatan PO...">${d.note||''}</textarea></div>
     </div>
-    <div class="mf"><button class="btn" id="bCl2">Batal</button><button class="btn btn-p" id="bSvI">Simpan</button></div>
+    <div class="mf"><button class="btn" id="bCl2">Batal</button><button class="btn btn-p" id="bSvPO" data-id="${d.id||''}">Simpan PO</button></div>
   </div></div>`;
   }
 
-  // STOK KELUAR — multi SKU
-  if(type==='out'||type==='editOut'){
-    const custOpts=S.customers.map(c=>`<option value="${c.id}" ${d.custId===c.id?'selected':''}>${c.nama}</option>`).join('');
-    const items=d.items||[{id:uid(),sku:'',qty:1,hj:0,hpp:0,disc:0,total:0}];
-    const isEdit=type==='editOut';
+  // PEMBELIAN
+  if(type==='buy'||type==='editBuy'){
+    const supOpts=S.suppliers.map(s=>`<option value="${s.id}" ${d.supId===s.id?'selected':''}>${s.nama}</option>`).join('');
+    const items=d.items||[{id:uid(),sku:'',qty:1,hargaListAsli:0,disc:0,hargaNetAsli:0,totalAsli:0}];
     return`<div class="ov" id="mOv"><div class="modal modal-lg">
-    <div class="mh"><h3>${isEdit?'Edit Penjualan':'Catat Penjualan'}</h3><button class="btn btn-ic" id="bCl"><i class="ti ti-x"></i></button></div>
+    <div class="mh"><h3>${type==='editBuy'?'Edit Pembelian':'Catat Pembelian'}</h3><button class="btn btn-ic" id="bCl"><i class="ti ti-x"></i></button></div>
     <div class="mb">
       <div class="fr c3">
         <div><label>Tanggal</label><input id="fTg" type="date" value="${d.tgl||today()}"></div>
         <div><label>No. Invoice</label><input id="fIn" value="${d.inv||''}" placeholder="INV-001"></div>
-        <div><label>Customer</label><select id="fCust"><option value="">— Pilih Customer —</option>${custOpts}</select></div>
+        <div><label>Supplier</label><select id="fSup"><option value="">— Pilih —</option>${supOpts}</select></div>
+      </div>
+      <div class="fr c2">
+        <div><label>Mata Uang</label><select id="fCurr">${CURRENCIES.map(c=>`<option value="${c}" ${d.curr===c?'selected':''}>${c}</option>`).join('')}</select></div>
+        <div><label>Rate ke IDR (1 unit = Rp ...)</label><input id="fRate" type="number" value="${d.rate||1}" min="0" step="0.01"></div>
+      </div>
+      <div class="divider"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <label style="margin:0">Item Produk <span class="tm" style="font-weight:400">— harga dalam mata uang terpilih</span></label>
+        <button class="btn btn-sm btn-p" id="bAddItemBuy"><i class="ti ti-plus"></i> Tambah SKU</button>
+      </div>
+      <div style="font-size:11px;color:var(--t2);display:grid;grid-template-columns:1fr 100px 70px 100px 70px 100px 36px;gap:5px;padding:0 8px;margin-bottom:4px">
+        <span>SKU / Produk</span><span>Harga List</span><span>Disc%</span><span>Harga Net</span><span>Qty</span><span>Total</span><span></span>
+      </div>
+      <div id="itemListBuy">${items.map((it,i)=>skuLineBuy(it,i)).join('')}</div>
+      <div class="sb" style="margin-top:10px">
+        <div class="row"><span>Total Pembelian</span><strong id="buyGrand">—</strong></div>
+        <div class="row"><span>Total dalam IDR (HPP)</span><strong id="buyGrandIDR">—</strong></div>
+      </div>
+    </div>
+    <div class="mf"><button class="btn" id="bCl2">Batal</button><button class="btn btn-p" id="bSvBuy" data-id="${d.id||''}">Simpan</button></div>
+  </div></div>`;
+  }
+
+  // PENJUALAN
+  if(type==='sell'||type==='editSell'){
+    const custOpts=S.customers.map(c=>`<option value="${c.id}" ${d.custId===c.id?'selected':''}>${c.nama}</option>`).join('');
+    const items=d.items||[{id:uid(),sku:'',qty:1,hj:0,disc:0,total:0}];
+    return`<div class="ov" id="mOv"><div class="modal modal-lg">
+    <div class="mh"><h3>${type==='editSell'?'Edit Penjualan':'Catat Penjualan'}</h3><button class="btn btn-ic" id="bCl"><i class="ti ti-x"></i></button></div>
+    <div class="mb">
+      <div class="fr c3">
+        <div><label>Tanggal</label><input id="fTg" type="date" value="${d.tgl||today()}"></div>
+        <div><label>No. Invoice</label><input id="fIn" value="${d.inv||''}" placeholder="INV-001"></div>
+        <div><label>Customer</label><select id="fCust"><option value="">— Pilih —</option>${custOpts}</select></div>
       </div>
       <div class="fr c3">
         <div><label>Channel</label><select id="fCh"><option value="Online" ${d.ch==='Online'?'selected':''}>Online (Marketplace)</option><option value="Offline" ${d.ch==='Offline'?'selected':''}>Offline (Toko)</option></select></div>
+        <div><label>Payment Term</label><select id="fPt">
+          <option value="cash" ${d.payTerm!=='credit'&&d.payTerm!=='cod'?'selected':''}>Cash</option>
+          <option value="credit" ${d.payTerm==='credit'?'selected':''}>Credit Term</option>
+          <option value="cod" ${d.payTerm==='cod'?'selected':''}>COD</option>
+        </select></div>
         <div><label>Fee Marketplace (Rp)</label><input id="fFee" type="number" value="${d.fee||0}" min="0"></div>
-        <div><label>Payment Term</label><select id="fPt"><option value="cash" ${d.payTerm!=='credit'?'selected':''}>Cash</option><option value="credit" ${d.payTerm==='credit'?'selected':''}>Credit Term</option></select></div>
       </div>
       <div id="termRow" style="${d.payTerm==='credit'?'':'display:none'}" class="fr c2">
         <div><label>Jangka (hari)</label><input id="fTermDays" type="number" value="${d.termDays||30}" min="1"></div>
@@ -614,88 +751,105 @@ function modal(){
       <div class="divider"></div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <label style="margin:0">Item Produk</label>
-        <button class="btn btn-sm btn-p" id="bAddItemO"><i class="ti ti-plus"></i> Tambah SKU</button>
+        <button class="btn btn-sm btn-p" id="bAddItemSell"><i class="ti ti-plus"></i> Tambah SKU</button>
       </div>
-      <div style="font-size:11px;color:var(--t2);display:grid;grid-template-columns:1fr 100px 80px 80px 80px 36px;gap:6px;padding:0 8px;margin-bottom:4px">
-        <span>SKU / Produk</span><span>Harga Jual</span><span>Disc %</span><span>Qty</span><span>Total</span><span></span>
+      <div style="font-size:11px;color:var(--t2);display:grid;grid-template-columns:1fr 110px 80px 70px 100px 36px;gap:6px;padding:0 8px;margin-bottom:4px">
+        <span>SKU / Produk</span><span>Harga Jual</span><span>Disc%</span><span>Qty</span><span>Total</span><span></span>
       </div>
-      <div id="itemListO">
-      ${items.map((it,idx)=>skuLineOut(it,idx)).join('')}
-      </div>
-      <div class="sb" style="margin-top:10px" id="outSummary">
-        ${calcOutSummary(items,parseFloat(d.fee||0))}
-      </div>
+      <div id="itemListSell">${items.map((it,i)=>skuLineSell(it,i)).join('')}</div>
+      <div class="fr" style="margin-top:10px;grid-template-columns:200px"><div><label>Biaya Kirim / Ongkir (Rp)</label><input id="fOngkir" type="number" value="${d.ongkir||0}" min="0"></div></div>
+      <div class="sb" id="sellSummary">${calcSellSummary(items,parseFloat(d.fee||0),parseFloat(d.ongkir||0))}</div>
     </div>
-    <div class="mf"><button class="btn" id="bCl2">Batal</button><button class="btn btn-p" id="bSvO" data-id="${d.id||''}">Simpan</button></div>
+    <div class="mf"><button class="btn" id="bCl2">Batal</button><button class="btn btn-p" id="bSvSell" data-id="${d.id||''}">Simpan</button></div>
   </div></div>`;
   }
-
-  // PAYMENT
-  if(type==='payment'){
-    const inv=S.stockOut.find(x=>x.id===d.id)||{};
-    const paid=(inv.payments||[]).reduce((a,p)=>a+p.amount,0);
-    const sisa=inv.neto-paid;
+  // PAYMENT CUSTOMER (sale)
+  if(type==='paySell'){
+    const inv=S.sales.find(x=>x.id===d.id)||{};
+    const paid=(inv.payments||[]).reduce((a,p)=>a+(p.amountIDR||p.amount),0);
+    const neto=saleNeto(inv),sisa=neto-paid;
     return`<div class="ov" id="mOv"><div class="modal">
-    <div class="mh"><h3>Catat Pembayaran</h3><button class="btn btn-ic" id="bCl"><i class="ti ti-x"></i></button></div>
+    <div class="mh"><h3>Catat Pembayaran Customer</h3><button class="btn btn-ic" id="bCl"><i class="ti ti-x"></i></button></div>
     <div class="mb">
-      <div class="ib">Invoice: <strong>${inv.inv||'—'}</strong> &nbsp;·&nbsp; Total: <strong>${rp(inv.neto)}</strong> &nbsp;·&nbsp; Sudah dibayar: <strong class="g">${rp(paid)}</strong> &nbsp;·&nbsp; Sisa: <strong class="r">${rp(sisa)}</strong></div>
+      <div class="ib">Invoice <strong>${inv.inv||'—'}</strong> · Neto: <strong>${rp(neto)}</strong> · Dibayar: <strong class="g">${rp(paid)}</strong> · Sisa: <strong class="r">${rp(sisa)}</strong></div>
       <div class="fr c2">
         <div><label>Tanggal Bayar</label><input id="fTg" type="date" value="${today()}"></div>
         <div><label>Metode Pembayaran</label><select id="fMet">${PAY_METHODS.map(m=>`<option value="${m}">${m}</option>`).join('')}</select></div>
       </div>
-      <div class="fr">
-        <div><label>Jumlah Bayar (Rp)</label><input id="fAmt" type="number" value="${sisa}" min="0"></div>
-      </div>
-      <div class="fr"><label>Catatan (opsional)</label><input id="fNote" placeholder="Catatan pembayaran..."></div>
-      ${(inv.payments||[]).length?`<div class="divider"></div>
-      <div style="font-size:11px;font-weight:700;color:var(--t2);margin-bottom:6px">RIWAYAT PEMBAYARAN</div>
+      <div class="fr"><label>Jumlah Bayar (Rp)</label><input id="fAmt" type="number" value="${sisa}" min="0"></div>
+      <div class="fr"><label>Catatan (Opsional)</label><input id="fNote" placeholder="Catatan..."></div>
+      ${(inv.payments||[]).length?`<div class="divider"></div><div style="font-size:11px;font-weight:700;color:var(--t2);margin-bottom:6px">RIWAYAT PEMBAYARAN</div>
       <table><thead><tr><th>Tanggal</th><th>Metode</th><th class="rt">Jumlah</th><th>Catatan</th></tr></thead><tbody>
-      ${inv.payments.map(p=>`<tr><td>${fd(p.tgl)}</td><td>${p.met}</td><td class="rt g">${rp(p.amount)}</td><td>${p.note||'—'}</td></tr>`).join('')}
+      ${inv.payments.map(p=>`<tr><td>${fd(p.tgl)}</td><td>${p.met}</td><td class="rt g">${rp(p.amountIDR||p.amount)}</td><td>${p.note||'—'}</td></tr>`).join('')}
       </tbody></table>`:''}
     </div>
-    <div class="mf"><button class="btn" id="bCl2">Batal</button><button class="btn btn-p" id="bSvPay" data-id="${d.id}">Simpan Pembayaran</button></div>
+    <div class="mf"><button class="btn" id="bCl2">Batal</button><button class="btn btn-p" id="bSvPaySell" data-id="${d.id}">Simpan Pembayaran</button></div>
+  </div></div>`;
+  }
+
+  // PAYMENT SUPPLIER (purchase) — multi currency
+  if(type==='payBuy'){
+    const inv=S.purchases.find(x=>x.id===d.id)||{};
+    const paid=(inv.payments||[]).reduce((a,p)=>a+(p.amountIDR||p.amount),0);
+    const tIDR=purchaseTotalIDR(inv),sisa=tIDR-paid;
+    return`<div class="ov" id="mOv"><div class="modal">
+    <div class="mh"><h3>Catat Pembayaran ke Supplier</h3><button class="btn btn-ic" id="bCl"><i class="ti ti-x"></i></button></div>
+    <div class="mb">
+      <div class="ib">Invoice <strong>${inv.inv||'—'}</strong> · Total: <strong>${rp(tIDR)}</strong> · Dibayar: <strong class="g">${rp(paid)}</strong> · Sisa: <strong class="r">${rp(sisa)}</strong></div>
+      <div class="fr c2">
+        <div><label>Tanggal Bayar</label><input id="fTg" type="date" value="${today()}"></div>
+        <div><label>Metode Pembayaran</label><select id="fMet">${PAY_METHODS.map(m=>`<option value="${m}">${m}</option>`).join('')}</select></div>
+      </div>
+      <div class="fr c3">
+        <div><label>Mata Uang</label><select id="fCurr">${CURRENCIES.map(c=>`<option value="${c}">${c}</option>`).join('')}</select></div>
+        <div><label>Rate ke IDR</label><input id="fRate" type="number" value="1" min="0" step="0.01"></div>
+        <div><label>Jumlah Bayar</label><input id="fAmt" type="number" value="0" min="0"></div>
+      </div>
+      <div class="sb"><div class="row"><span>Jumlah dalam IDR</span><strong id="payBuyIDR">Rp 0</strong></div></div>
+      <div class="fr" style="margin-top:10px"><label>Catatan (Opsional)</label><input id="fNote" placeholder="Catatan..."></div>
+      ${(inv.payments||[]).length?`<div class="divider"></div><div style="font-size:11px;font-weight:700;color:var(--t2);margin-bottom:6px">RIWAYAT PEMBAYARAN</div>
+      <table><thead><tr><th>Tanggal</th><th>Metode</th><th>Mata Uang</th><th class="rt">Jumlah</th><th class="rt">IDR</th></tr></thead><tbody>
+      ${inv.payments.map(p=>`<tr><td>${fd(p.tgl)}</td><td>${p.met}</td><td>${p.curr||'IDR'}</td><td class="rt">${cur(p.amount,p.curr)}</td><td class="rt g">${rp(p.amountIDR||p.amount)}</td></tr>`).join('')}
+      </tbody></table>`:''}
+    </div>
+    <div class="mf"><button class="btn" id="bCl2">Batal</button><button class="btn btn-p" id="bSvPayBuy" data-id="${d.id}">Simpan Pembayaran</button></div>
   </div></div>`;
   }
 
   // SUPPLIER
-  if(type==='sup'){
-    return`<div class="ov" id="mOv"><div class="modal">
+  if(type==='sup')return`<div class="ov" id="mOv"><div class="modal">
     <div class="mh"><h3>${d.id?'Edit Supplier':'Tambah Supplier'}</h3><button class="btn btn-ic" id="bCl"><i class="ti ti-x"></i></button></div>
     <div class="mb">
-      <div class="fr c2"><div><label>Nama Supplier *</label><input id="fNm" value="${d.nama||''}" placeholder="Nama perusahaan/toko"></div>
-      <div><label>PIC (Opsional)</label><input id="fPic" value="${d.pic||''}" placeholder="Nama kontak person"></div></div>
-      <div class="fr c2"><div><label>No. Telp (Opsional)</label><input id="fTelp" value="${d.telp||''}" placeholder="08xx-xxxx-xxxx"></div>
-      <div><label>Email (Opsional)</label><input id="fEmail" value="${d.email||''}" placeholder="email@supplier.com"></div></div>
-      <div class="fr"><label>Alamat (Opsional)</label><textarea id="fAlamat" rows="2" placeholder="Alamat lengkap...">${d.alamat||''}</textarea></div>
-      <div class="fr c2"><div><label>NPWP (Opsional)</label><input id="fNpwp" value="${d.npwp||''}" placeholder="xx.xxx.xxx.x-xxx.xxx"></div>
-      <div><label>Catatan (Opsional)</label><input id="fNote" value="${d.note||''}" placeholder="Catatan tambahan..."></div></div>
+      <div class="fr c2"><div><label>Nama Supplier *</label><input id="fNm" value="${d.nama||''}" placeholder="Nama perusahaan"></div>
+      <div><label>PIC (Opsional)</label><input id="fPic" value="${d.pic||''}"></div></div>
+      <div class="fr c2"><div><label>No. Telp (Opsional)</label><input id="fTelp" value="${d.telp||''}"></div>
+      <div><label>Email (Opsional)</label><input id="fEmail" value="${d.email||''}"></div></div>
+      <div class="fr"><label>Alamat (Opsional)</label><textarea id="fAlamat" rows="2">${d.alamat||''}</textarea></div>
+      <div class="fr c2"><div><label>NPWP (Opsional)</label><input id="fNpwp" value="${d.npwp||''}"></div>
+      <div><label>Catatan (Opsional)</label><input id="fNote" value="${d.note||''}"></div></div>
     </div>
     <div class="mf"><button class="btn" id="bCl2">Batal</button><button class="btn btn-p" id="bSvSup" data-id="${d.id||''}">Simpan</button></div>
   </div></div>`;
-  }
 
   // CUSTOMER
-  if(type==='cust'){
-    return`<div class="ov" id="mOv"><div class="modal">
+  if(type==='cust')return`<div class="ov" id="mOv"><div class="modal">
     <div class="mh"><h3>${d.id?'Edit Customer':'Tambah Customer'}</h3><button class="btn btn-ic" id="bCl"><i class="ti ti-x"></i></button></div>
     <div class="mb">
-      <div class="fr c2"><div><label>Nama Customer *</label><input id="fNm" value="${d.nama||''}" placeholder="Nama perusahaan/personal"></div>
+      <div class="fr c2"><div><label>Nama Customer *</label><input id="fNm" value="${d.nama||''}"></div>
       <div><label>Tipe</label><select id="fTipe"><option value="Retail" ${d.tipe==='Retail'?'selected':''}>Retail</option><option value="Corporate" ${d.tipe==='Corporate'?'selected':''}>Corporate</option><option value="Reseller" ${d.tipe==='Reseller'?'selected':''}>Reseller</option></select></div></div>
-      <div class="fr c2"><div><label>PIC (Opsional)</label><input id="fPic" value="${d.pic||''}" placeholder="Nama kontak person"></div>
-      <div><label>No. Telp (Opsional)</label><input id="fTelp" value="${d.telp||''}" placeholder="08xx-xxxx-xxxx"></div></div>
-      <div class="fr c2"><div><label>Email (Opsional)</label><input id="fEmail" value="${d.email||''}" placeholder="email@customer.com"></div>
-      <div><label>NPWP (Opsional)</label><input id="fNpwp" value="${d.npwp||''}" placeholder="xx.xxx.xxx.x-xxx.xxx"></div></div>
-      <div class="fr"><label>Alamat (Opsional)</label><textarea id="fAlamat" rows="2" placeholder="Alamat lengkap...">${d.alamat||''}</textarea></div>
-      <div class="fr c2"><div><label>Credit Limit (Rp, Opsional)</label><input id="fCl" type="number" value="${d.creditLimit||0}" min="0"></div>
-      <div><label>Catatan (Opsional)</label><input id="fNote" value="${d.note||''}" placeholder="Catatan tambahan..."></div></div>
+      <div class="fr c2"><div><label>PIC (Opsional)</label><input id="fPic" value="${d.pic||''}"></div>
+      <div><label>No. Telp (Opsional)</label><input id="fTelp" value="${d.telp||''}"></div></div>
+      <div class="fr c2"><div><label>Email (Opsional)</label><input id="fEmail" value="${d.email||''}"></div>
+      <div><label>NPWP (Opsional)</label><input id="fNpwp" value="${d.npwp||''}"></div></div>
+      <div class="fr"><label>Alamat (Opsional)</label><textarea id="fAlamat" rows="2">${d.alamat||''}</textarea></div>
+      <div class="fr"><label>Catatan (Opsional)</label><input id="fNote" value="${d.note||''}"></div>
     </div>
     <div class="mf"><button class="btn" id="bCl2">Batal</button><button class="btn btn-p" id="bSvCust" data-id="${d.id||''}">Simpan</button></div>
   </div></div>`;
-  }
 
   // BIAYA
   if(type==='exp'){
-    const invOpts=[...S.stockIn.map(x=>x.inv),...S.stockOut.map(x=>x.inv)].filter(Boolean);
+    const invOpts=[...S.purchases.map(x=>x.inv),...S.sales.map(x=>x.inv)].filter(Boolean);
     return`<div class="ov" id="mOv"><div class="modal">
     <div class="mh"><h3>Catat Biaya</h3><button class="btn btn-ic" id="bCl"><i class="ti ti-x"></i></button></div>
     <div class="mb">
@@ -703,7 +857,7 @@ function modal(){
       <div><label>Kategori</label><select id="fCat">${EXPENSE_CATS.map(c=>`<option value="${c}">${c}</option>`).join('')}</select></div></div>
       <div class="fr"><label>Deskripsi</label><input id="fDesc" placeholder="Keterangan biaya..."></div>
       <div class="fr c2"><div><label>Jumlah (Rp)</label><input id="fJml" type="number" value="0" min="0"></div>
-      <div><label>Kaitkan ke Invoice (Opsional)</label><select id="fInvRef"><option value="">— Tidak dikaitkan —</option>${invOpts.map(i=>`<option value="${i}">${i}</option>`).join('')}</select></div></div>
+      <div><label>Kaitkan ke Invoice (Opsional)</label><select id="fInvRef"><option value="">— Tidak —</option>${invOpts.map(i=>`<option value="${i}">${i}</option>`).join('')}</select></div></div>
     </div>
     <div class="mf"><button class="btn" id="bCl2">Batal</button><button class="btn btn-p" id="bSvExp">Simpan</button></div>
   </div></div>`;
@@ -717,14 +871,13 @@ function modal(){
     <div class="mb">
       <div class="fr c2"><div><label>Tanggal</label><input id="fTg" type="date" value="${today()}"></div>
       <div><label>Tipe Retur</label><select id="fTipe"><option value="Online">Online</option><option value="Offline">Offline</option></select></div></div>
-      <div class="fr c2"><div><label>SKU Produk</label><select id="fSkRet"><option value="">— Pilih SKU —</option>${skuOpts}</select></div>
+      <div class="fr c2"><div><label>SKU Produk</label><select id="fSkRet"><option value="">— Pilih —</option>${skuOpts}</select></div>
       <div><label>Qty Retur</label><input id="fQt" type="number" value="1" min="1"></div></div>
       <div class="fr c2"><div><label>Invoice Referensi (Opsional)</label><input id="fInvRef" placeholder="INV-001"></div>
-      <div><label>Channel</label><input id="fCh" placeholder="Tokopedia / Shopee / dll"></div></div>
-      <div class="fr"><label>Alasan Retur</label><input id="fAlasan" placeholder="Barang rusak / salah kirim / dll"></div>
-      <div style="display:flex;align-items:center;gap:8px;padding:10px;background:#F5F6FA;border-radius:7px;margin-top:4px">
-        <input type="checkbox" id="fStokMasuk" style="width:auto">
-        <label for="fStokMasuk" style="margin:0;cursor:pointer">Konfirmasi stok masuk kembali ke gudang sekarang</label>
+      <div><label>Channel</label><input id="fCh" placeholder="Tokopedia / Shopee"></div></div>
+      <div class="fr"><label>Alasan Retur</label><input id="fAlasan" placeholder="Barang rusak / salah kirim"></div>
+      <div style="display:flex;align-items:center;gap:8px;padding:10px;background:#F5F6FA;border-radius:7px">
+        <input type="checkbox" id="fStokMasuk"><label for="fStokMasuk" style="margin:0;cursor:pointer">Konfirmasi stok masuk kembali ke gudang sekarang</label>
       </div>
     </div>
     <div class="mf"><button class="btn" id="bCl2">Batal</button><button class="btn btn-p" id="bSvRet">Simpan</button></div>
@@ -732,50 +885,184 @@ function modal(){
   }
   return'';
 }
-
-// ── SKU LINES ─────────────────────────────────────────
-function skuLineIn(it,idx){
-  const skuOpts=S.products.map(p=>`<option value="${p.sku}" ${it.sku===p.sku?'selected':''}>${p.sku} — ${p.nama}</option>`).join('');
-  return`<div class="sku-line" data-idx="${idx}" id="iline-${idx}">
-    <select class="iSku" data-idx="${idx}"><option value="">— SKU —</option>${skuOpts}</select>
-    <input class="iHl" type="number" value="${it.hl||0}" placeholder="Harga List" data-idx="${idx}">
-    <input class="iDc" type="number" value="${it.disc||0}" placeholder="Disc %" min="0" max="100" data-idx="${idx}">
-    <input class="iHn" type="number" value="${it.hn||0}" placeholder="Net" readonly style="background:#f5f6fa" data-idx="${idx}">
-    <input class="iQt" type="number" value="${it.qty||1}" placeholder="Qty" min="1" data-idx="${idx}">
-    <input class="iTot" type="number" value="${it.total||0}" placeholder="Total" readonly style="background:#f5f6fa" data-idx="${idx}">
-    <button class="btn btn-ic btn-sm btn-d removeItem" data-idx="${idx}"><i class="ti ti-minus"></i></button>
+// ═══ SKU LINE HELPERS ═══
+function skuLinePO(it,idx){
+  const opts=S.products.map(p=>`<option value="${p.sku}" ${it.sku===p.sku?'selected':''}>${p.sku} — ${p.nama}</option>`).join('');
+  return`<div class="sku-line" style="grid-template-columns:1fr 130px 90px 130px 36px" data-idx="${idx}">
+    <select class="poSku"><option value="">— SKU —</option>${opts}</select>
+    <input class="poHarga" type="number" value="${it.hargaAsli||0}" placeholder="Harga">
+    <input class="poQty" type="number" value="${it.qty||1}" placeholder="Qty" min="1">
+    <input class="poTot" type="number" value="${it.total||0}" readonly style="background:#f5f6fa">
+    <button class="btn btn-ic btn-sm btn-d poRem"><i class="ti ti-minus"></i></button>
   </div>`;
 }
-function skuLineOut(it,idx){
-  const skuOpts=S.products.map(p=>`<option value="${p.sku}" ${it.sku===p.sku?'selected':''}>${p.sku} — ${p.nama}</option>`).join('');
-  return`<div class="sku-line" style="grid-template-columns:1fr 100px 80px 80px 80px 36px" data-idx="${idx}" id="oline-${idx}">
-    <select class="oSku" data-idx="${idx}"><option value="">— SKU —</option>${skuOpts}</select>
-    <input class="oHj" type="number" value="${it.hj||0}" placeholder="Harga Jual" data-idx="${idx}">
-    <input class="oDc" type="number" value="${it.disc||0}" placeholder="Disc %" min="0" max="100" data-idx="${idx}">
-    <input class="oQt" type="number" value="${it.qty||1}" placeholder="Qty" min="1" data-idx="${idx}">
-    <input class="oTot" type="number" value="${it.total||0}" placeholder="Total" readonly style="background:#f5f6fa" data-idx="${idx}">
-    <button class="btn btn-ic btn-sm btn-d removeItemO" data-idx="${idx}"><i class="ti ti-minus"></i></button>
+function skuLineBuy(it,idx){
+  const opts=S.products.map(p=>`<option value="${p.sku}" ${it.sku===p.sku?'selected':''}>${p.sku} — ${p.nama}</option>`).join('');
+  return`<div class="sku-line" style="grid-template-columns:1fr 100px 70px 100px 70px 100px 36px" data-idx="${idx}">
+    <select class="bySku"><option value="">— SKU —</option>${opts}</select>
+    <input class="byHl" type="number" value="${it.hargaListAsli||0}" placeholder="List">
+    <input class="byDc" type="number" value="${it.disc||0}" placeholder="Disc%" min="0" max="100">
+    <input class="byHn" type="number" value="${it.hargaNetAsli||0}" readonly style="background:#f5f6fa">
+    <input class="byQt" type="number" value="${it.qty||1}" placeholder="Qty" min="1">
+    <input class="byTot" type="number" value="${it.totalAsli||0}" readonly style="background:#f5f6fa">
+    <button class="btn btn-ic btn-sm btn-d byRem"><i class="ti ti-minus"></i></button>
   </div>`;
 }
-function calcOutSummary(items,fee){
+function skuLineSell(it,idx){
+  const opts=S.products.map(p=>`<option value="${p.sku}" ${it.sku===p.sku?'selected':''}>${p.sku} — ${p.nama}</option>`).join('');
+  return`<div class="sku-line" style="grid-template-columns:1fr 110px 80px 70px 100px 36px" data-idx="${idx}">
+    <select class="slSku"><option value="">— SKU —</option>${opts}</select>
+    <input class="slHj" type="number" value="${it.hj||0}" placeholder="Harga Jual">
+    <input class="slDc" type="number" value="${it.disc||0}" placeholder="Disc%" min="0" max="100">
+    <input class="slQt" type="number" value="${it.qty||1}" placeholder="Qty" min="1">
+    <input class="slTot" type="number" value="${it.total||0}" readonly style="background:#f5f6fa">
+    <button class="btn btn-ic btn-sm btn-d slRem"><i class="ti ti-minus"></i></button>
+  </div>`;
+}
+function calcSellSummary(items,fee,ongkir){
   const gross=items.reduce((a,i)=>a+(i.total||0),0);
   const neto=gross-(fee||0);
-  const hpp=items.reduce((a,i)=>a+(i.hpp||0)*i.qty,0);
-  const laba=neto-hpp;
-  const mp=neto>0?laba/neto:0;
-  return`<div class="row"><span>Gross</span><span>${rp(gross)}</span></div>
+  return`<div class="row"><span>Subtotal Barang</span><span>${rp(gross)}</span></div>
     <div class="row"><span>Fee Marketplace</span><span class="r">${rp(fee||0)}</span></div>
-    <div class="row"><span>Neto</span><span>${rp(neto)}</span></div>
-    <div class="row"><span>HPP</span><span class="o">${rp(hpp)}</span></div>
-    <div class="row"><span>Laba Kotor</span><strong class="${laba>=0?'g':'r'}">${rp(laba)}</strong></div>
-    <div class="row"><span>Margin</span><strong class="${mp>=.2?'g':mp>=.1?'o':'r'}">${pct(mp)}</strong></div>`;
+    <div class="row"><span>Biaya Kirim / Ongkir</span><span>${rp(ongkir||0)}</span></div>
+    <div class="row"><span>Total Neto Invoice</span><strong>${rp(neto)}</strong></div>`;
 }
 
-// ── EVENTS ────────────────────────────────────────────
+// collectors
+function collectPO(){
+  return [...document.querySelectorAll('#itemListPO .sku-line')].map(l=>{
+    const sku=l.querySelector('.poSku').value;
+    const harga=parseFloat(l.querySelector('.poHarga').value)||0;
+    const qty=parseFloat(l.querySelector('.poQty').value)||1;
+    const p=S.products.find(x=>x.sku===sku);
+    return{id:uid(),sku,nama:p?.nama||'',qty,hargaAsli:harga,total:harga*qty};
+  });
+}
+function collectBuy(){
+  return [...document.querySelectorAll('#itemListBuy .sku-line')].map(l=>{
+    const sku=l.querySelector('.bySku').value;
+    const hl=parseFloat(l.querySelector('.byHl').value)||0;
+    const dc=parseFloat(l.querySelector('.byDc').value)||0;
+    const qty=parseFloat(l.querySelector('.byQt').value)||1;
+    const hn=hl*(1-dc/100);
+    const p=S.products.find(x=>x.sku===sku);
+    return{id:uid(),sku,nama:p?.nama||'',brand:p?.brand||'',hargaListAsli:hl,disc:dc,hargaNetAsli:hn,qty,totalAsli:hn*qty};
+  });
+}
+function collectSell(){
+  return [...document.querySelectorAll('#itemListSell .sku-line')].map(l=>{
+    const sku=l.querySelector('.slSku').value;
+    const hj=parseFloat(l.querySelector('.slHj').value)||0;
+    const dc=parseFloat(l.querySelector('.slDc').value)||0;
+    const qty=parseFloat(l.querySelector('.slQt').value)||1;
+    const hjNet=hj*(1-dc/100);
+    const p=S.products.find(x=>x.sku===sku);
+    const s=sku?stats(sku):{avg:0};
+    return{id:uid(),sku,nama:p?.nama||'',brand:p?.brand||'',hj:hjNet,disc:dc,qty,total:hjNet*qty,hpp:s.avg};
+  });
+}
+function updatePOTotal(){
+  const items=collectPO();const curr=document.getElementById('fCurr')?.value||'IDR';
+  const rate=parseFloat(document.getElementById('fRate')?.value)||1;
+  const tot=items.reduce((a,i)=>a+i.total,0);
+  const g=document.getElementById('poGrand');if(g)g.textContent=cur(tot,curr);
+  const gi=document.getElementById('poGrandIDR');if(gi)gi.textContent=rp(tot*rate);
+}
+function updateBuyTotal(){
+  const items=collectBuy();const curr=document.getElementById('fCurr')?.value||'IDR';
+  const rate=parseFloat(document.getElementById('fRate')?.value)||1;
+  const tot=items.reduce((a,i)=>a+i.totalAsli,0);
+  const g=document.getElementById('buyGrand');if(g)g.textContent=cur(tot,curr);
+  const gi=document.getElementById('buyGrandIDR');if(gi)gi.textContent=rp(tot*rate);
+}
+function updateSellSummary(){
+  const items=collectSell();
+  const fee=parseFloat(document.getElementById('fFee')?.value)||0;
+  const ongkir=parseFloat(document.getElementById('fOngkir')?.value)||0;
+  const el=document.getElementById('sellSummary');
+  if(el)el.innerHTML=calcSellSummary(items,fee,ongkir);
+}
+
+// ═══ PDF & EXCEL EXPORT ═══
+function exportPOpdf(po){
+  const {jsPDF}=window.jspdf;const doc=new jsPDF();
+  const sup=S.suppliers.find(s=>s.id===po.supId);
+  doc.setFontSize(18);doc.text('PURCHASE ORDER',14,20);
+  doc.setFontSize(10);
+  doc.text(`No. PO: ${po.noPO||'-'}`,14,30);
+  doc.text(`Tanggal: ${fd(po.tgl)}`,14,36);
+  doc.text(`Supplier: ${sup?sup.nama:'-'}`,14,42);
+  doc.text(`Mata Uang: ${po.curr}${po.curr!=='IDR'?' (Rate: '+fmt(po.rate)+')':''}`,14,48);
+  const rows=(po.items||[]).map((i,n)=>[n+1,i.sku,i.nama,fmt(i.qty),cur(i.hargaAsli,po.curr),cur(i.total,po.curr)]);
+  const total=(po.items||[]).reduce((a,i)=>a+i.total,0);
+  doc.autoTable({startY:54,head:[['No','SKU','Nama Barang','Qty','Harga','Total']],body:rows,
+    foot:[['','','','','TOTAL',cur(total,po.curr)]],theme:'grid',headStyles:{fillColor:[24,95,165]},footStyles:{fillColor:[240,242,247],textColor:[28,35,51]}});
+  if(po.note){doc.setFontSize(9);doc.text('Catatan: '+po.note,14,doc.lastAutoTable.finalY+10);}
+  doc.save(`PO_${po.noPO||po.id}.pdf`);
+}
+function exportPOxls(po){
+  const sup=S.suppliers.find(s=>s.id===po.supId);
+  const data=[['PURCHASE ORDER'],[],['No. PO',po.noPO||'-'],['Tanggal',fd(po.tgl)],['Supplier',sup?sup.nama:'-'],['Mata Uang',po.curr],['Rate',po.rate],[],
+    ['No','SKU','Nama','Qty','Harga','Total']];
+  (po.items||[]).forEach((i,n)=>data.push([n+1,i.sku,i.nama,i.qty,i.hargaAsli,i.total]));
+  const total=(po.items||[]).reduce((a,i)=>a+i.total,0);
+  data.push(['','','','','TOTAL',total]);
+  const ws=XLSX.utils.aoa_to_sheet(data);const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'PO');XLSX.writeFile(wb,`PO_${po.noPO||po.id}.xlsx`);
+}
+function exportInvoicePdf(sale){
+  const {jsPDF}=window.jspdf;const doc=new jsPDF();
+  const cust=S.customers.find(c=>c.id===sale.custId);
+  const pr=saleProfit(sale);
+  doc.setFontSize(18);doc.text('INVOICE PENJUALAN',14,20);
+  doc.setFontSize(10);
+  doc.text(`No. Invoice: ${sale.inv||'-'}`,14,30);
+  doc.text(`Tanggal: ${fd(sale.tgl)}`,14,36);
+  doc.text(`Customer: ${cust?cust.nama:'-'}`,14,42);
+  doc.text(`Channel: ${sale.ch||'-'}`,14,48);
+  const rows=(sale.items||[]).map((i,n)=>[n+1,i.sku,i.nama,fmt(i.qty),rp(i.hj),i.disc?i.disc+'%':'-',rp(i.total)]);
+  doc.autoTable({startY:54,head:[['No','SKU','Nama Barang','Qty','Harga','Disc','Total']],body:rows,theme:'grid',headStyles:{fillColor:[24,95,165]}});
+  let y=doc.lastAutoTable.finalY+8;
+  doc.setFontSize(10);
+  const lbl=(t,v,yy)=>{doc.text(t,130,yy);doc.text(v,196,yy,{align:'right'});};
+  lbl('Subtotal Barang:',rp(pr.gross),y);y+=6;
+  if(pr.fee>0){lbl('Fee Marketplace:',rp(pr.fee),y);y+=6;}
+  if(pr.ongkir>0){lbl('Biaya Kirim:',rp(pr.ongkir),y);y+=6;}
+  doc.setFont(undefined,'bold');lbl('TOTAL:',rp(pr.neto),y);doc.setFont(undefined,'normal');
+  doc.save(`Invoice_${sale.inv||sale.id}.pdf`);
+}
+function exportInvoiceXls(sale){
+  const cust=S.customers.find(c=>c.id===sale.custId);
+  const pr=saleProfit(sale);
+  const data=[['INVOICE PENJUALAN'],[],['No. Invoice',sale.inv||'-'],['Tanggal',fd(sale.tgl)],['Customer',cust?cust.nama:'-'],['Channel',sale.ch||'-'],[],
+    ['No','SKU','Nama','Qty','Harga','Disc%','Total']];
+  (sale.items||[]).forEach((i,n)=>data.push([n+1,i.sku,i.nama,i.qty,i.hj,i.disc,i.total]));
+  data.push([]);data.push(['','','','','','Subtotal',pr.gross]);
+  if(pr.fee>0)data.push(['','','','','','Fee Marketplace',pr.fee]);
+  if(pr.ongkir>0)data.push(['','','','','','Biaya Kirim',pr.ongkir]);
+  data.push(['','','','','','TOTAL NETO',pr.neto]);
+  const ws=XLSX.utils.aoa_to_sheet(data);const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Invoice');XLSX.writeFile(wb,`Invoice_${sale.inv||sale.id}.xlsx`);
+}
+function exportLRxls(){
+  const m=metricsPenjualan(S.fp,S.fy,S.fm);
+  const inP=d=>{const dt=new Date(d);
+    if(S.fp==='monthly')return dt.getFullYear()===S.fy&&dt.getMonth()===S.fm;
+    if(S.fp==='quarterly')return dt.getFullYear()===S.fy&&Math.floor(dt.getMonth()/3)===Math.floor(S.fm/3);
+    if(S.fp==='semesterly')return dt.getFullYear()===S.fy&&(dt.getMonth()<6?0:1)===(S.fm<6?0:1);
+    return dt.getFullYear()===S.fy;};
+  const expP=S.expenses.filter(x=>inP(x.tgl));
+  const totalBiaya=expP.reduce((a,x)=>a+x.jumlah,0);
+  const data=[['LAPORAN LABA RUGI'],['Periode',`${S.fp==='monthly'?MO[S.fm]+' ':''}${S.fy}`],[],
+    ['Pendapatan Penjualan (Neto)',m.omz],['Harga Pokok Penjualan (HPP)',-m.hpp],['Laba Kotor',m.laba],[],['Biaya Operasional','']];
+  EXPENSE_CATS.forEach(c=>data.push([c,-expP.filter(x=>x.cat===c).reduce((a,x)=>a+x.jumlah,0)]));
+  data.push(['Total Biaya Operasional',-totalBiaya]);data.push(['LABA BERSIH',m.laba-totalBiaya]);
+  const ws=XLSX.utils.aoa_to_sheet(data);const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Laba Rugi');XLSX.writeFile(wb,`LabaRugi_${S.fy}.xlsx`);
+}
+// ═══ EVENT BINDINGS ═══
 function bind(){
-  // nav
   document.querySelectorAll('[data-nav]').forEach(el=>el.addEventListener('click',()=>{S.page=el.dataset.nav;S.q='';S.fb='';render();}));
-  // filters
   document.getElementById('iQ')?.addEventListener('input',e=>{S.q=e.target.value;render();});
   document.getElementById('sFb')?.addEventListener('change',e=>{S.fb=e.target.value;render();});
   document.getElementById('sFp')?.addEventListener('change',e=>{S.fp=e.target.value;render();});
@@ -783,50 +1070,76 @@ function bind(){
   document.getElementById('sFm')?.addEventListener('change',e=>{S.fm=parseInt(e.target.value);render();});
   // add buttons
   document.getElementById('bAddP')?.addEventListener('click',()=>{S.modal={type:'prod',data:{}};render();bm();});
-  document.getElementById('bAddI')?.addEventListener('click',()=>{S.modal={type:'in',data:{}};render();bm();});
-  document.getElementById('bAddO')?.addEventListener('click',()=>{S.modal={type:'out',data:{}};render();bm();});
+  document.getElementById('bAddPO')?.addEventListener('click',()=>{S.modal={type:'po',data:{}};render();bm();});
+  document.getElementById('bAddBuy')?.addEventListener('click',()=>{S.modal={type:'buy',data:{}};render();bm();});
+  document.getElementById('bAddSell')?.addEventListener('click',()=>{S.modal={type:'sell',data:{}};render();bm();});
   document.getElementById('bAddSup')?.addEventListener('click',()=>{S.modal={type:'sup',data:{}};render();bm();});
   document.getElementById('bAddCust')?.addEventListener('click',()=>{S.modal={type:'cust',data:{}};render();bm();});
   document.getElementById('bAddExp')?.addEventListener('click',()=>{S.modal={type:'exp',data:{}};render();bm();});
   document.getElementById('bAddRet')?.addEventListener('click',()=>{S.modal={type:'ret',data:{}};render();bm();});
-  // row actions
+  document.getElementById('bExpLR')?.addEventListener('click',exportLRxls);
+  // produk
   document.querySelectorAll('[data-ep]').forEach(el=>el.addEventListener('click',()=>{const p=S.products.find(x=>x.id===el.dataset.ep);S.modal={type:'prod',data:{...p}};render();bm();}));
   document.querySelectorAll('[data-dp]').forEach(el=>el.addEventListener('click',()=>{if(confirm('Hapus produk ini?')){S.products=S.products.filter(x=>x.id!==el.dataset.dp);save();render();}}));
-  document.querySelectorAll('[data-di]').forEach(el=>el.addEventListener('click',()=>{if(confirm('Hapus stok masuk ini?')){S.stockIn=S.stockIn.filter(x=>x.id!==el.dataset.di);save();render();}}));
-  document.querySelectorAll('[data-do]').forEach(el=>el.addEventListener('click',()=>{if(confirm('Hapus penjualan ini?')){S.stockOut=S.stockOut.filter(x=>x.id!==el.dataset.do);save();render();}}));
-  document.querySelectorAll('[data-eo]').forEach(el=>el.addEventListener('click',()=>{const inv=S.stockOut.find(x=>x.id===el.dataset.eo);S.modal={type:'editOut',data:{...inv}};render();bm();}));
-  document.querySelectorAll('[data-pay]').forEach(el=>el.addEventListener('click',()=>{S.modal={type:'payment',data:{id:el.dataset.pay}};render();bm();}));
+  // PO
+  document.querySelectorAll('[data-epo]').forEach(el=>el.addEventListener('click',()=>{const po=S.purchaseOrders.find(x=>x.id===el.dataset.epo);S.modal={type:'po',data:{...po}};render();bm();}));
+  document.querySelectorAll('[data-dpo]').forEach(el=>el.addEventListener('click',()=>{if(confirm('Hapus PO ini?')){S.purchaseOrders=S.purchaseOrders.filter(x=>x.id!==el.dataset.dpo);save();render();}}));
+  document.querySelectorAll('[data-pdfpo]').forEach(el=>el.addEventListener('click',()=>exportPOpdf(S.purchaseOrders.find(x=>x.id===el.dataset.pdfpo))));
+  document.querySelectorAll('[data-xlspo]').forEach(el=>el.addEventListener('click',()=>exportPOxls(S.purchaseOrders.find(x=>x.id===el.dataset.xlspo))));
+  document.querySelectorAll('[data-convpo]').forEach(el=>el.addEventListener('click',()=>{
+    const po=S.purchaseOrders.find(x=>x.id===el.dataset.convpo);
+    if(!confirm('Konversi PO ini menjadi transaksi Pembelian?'))return;
+    const items=(po.items||[]).map(i=>{const hn=i.hargaAsli;return{id:uid(),sku:i.sku,nama:i.nama,brand:(S.products.find(p=>p.sku===i.sku)||{}).brand||'',hargaListAsli:i.hargaAsli,disc:0,hargaNetAsli:hn,qty:i.qty,totalAsli:hn*i.qty};});
+    S.purchases.push({id:uid(),tgl:today(),inv:po.noPO,supId:po.supId,curr:po.curr,rate:po.rate,items,payTerm:'cash',payments:[],payStatus:'outstanding',fromPO:po.id});
+    S.purchaseOrders=S.purchaseOrders.map(x=>x.id===po.id?{...x,status:'received'}:x);
+    save();render();toast('PO dikonversi ke Pembelian');
+  }));
+  // pembelian
+  document.querySelectorAll('[data-ebuy]').forEach(el=>el.addEventListener('click',()=>{const b=S.purchases.find(x=>x.id===el.dataset.ebuy);S.modal={type:'editBuy',data:{...b}};render();bm();}));
+  document.querySelectorAll('[data-dbuy]').forEach(el=>el.addEventListener('click',()=>{if(confirm('Hapus pembelian ini?')){S.purchases=S.purchases.filter(x=>x.id!==el.dataset.dbuy);save();render();}}));
+  document.querySelectorAll('[data-paybuy]').forEach(el=>el.addEventListener('click',()=>{S.modal={type:'payBuy',data:{id:el.dataset.paybuy}};render();bm();}));
+  // penjualan
+  document.querySelectorAll('[data-esell]').forEach(el=>el.addEventListener('click',()=>{const s=S.sales.find(x=>x.id===el.dataset.esell);S.modal={type:'editSell',data:{...s}};render();bm();}));
+  document.querySelectorAll('[data-dsell]').forEach(el=>el.addEventListener('click',()=>{if(confirm('Hapus penjualan ini?')){S.sales=S.sales.filter(x=>x.id!==el.dataset.dsell);save();render();}}));
+  document.querySelectorAll('[data-paysell]').forEach(el=>el.addEventListener('click',()=>{S.modal={type:'paySell',data:{id:el.dataset.paysell}};render();bm();}));
+  document.querySelectorAll('[data-pdfsell]').forEach(el=>el.addEventListener('click',()=>exportInvoicePdf(S.sales.find(x=>x.id===el.dataset.pdfsell))));
+  document.querySelectorAll('[data-xlssell]').forEach(el=>el.addEventListener('click',()=>exportInvoiceXls(S.sales.find(x=>x.id===el.dataset.xlssell))));
+  document.querySelectorAll('[data-cair]').forEach(el=>el.addEventListener('click',()=>{
+    if(!confirm('Tandai dana invoice ini sudah cair?'))return;
+    S.sales=S.sales.map(x=>x.id===el.dataset.cair?{...x,danaStatus:'cair'}:x);save();render();toast('Dana ditandai cair');
+  }));
+  // supplier/customer
   document.querySelectorAll('[data-esup]').forEach(el=>el.addEventListener('click',()=>{const s=S.suppliers.find(x=>x.id===el.dataset.esup);S.modal={type:'sup',data:{...s}};render();bm();}));
   document.querySelectorAll('[data-dsup]').forEach(el=>el.addEventListener('click',()=>{if(confirm('Hapus supplier?')){S.suppliers=S.suppliers.filter(x=>x.id!==el.dataset.dsup);save();render();}}));
   document.querySelectorAll('[data-ecust]').forEach(el=>el.addEventListener('click',()=>{const c=S.customers.find(x=>x.id===el.dataset.ecust);S.modal={type:'cust',data:{...c}};render();bm();}));
   document.querySelectorAll('[data-dcust]').forEach(el=>el.addEventListener('click',()=>{if(confirm('Hapus customer?')){S.customers=S.customers.filter(x=>x.id!==el.dataset.dcust);save();render();}}));
+  // biaya/retur
   document.querySelectorAll('[data-dexp]').forEach(el=>el.addEventListener('click',()=>{if(confirm('Hapus biaya ini?')){S.expenses=S.expenses.filter(x=>x.id!==el.dataset.dexp);save();render();}}));
   document.querySelectorAll('[data-dret]').forEach(el=>el.addEventListener('click',()=>{if(confirm('Hapus retur ini?')){S.returns=S.returns.filter(x=>x.id!==el.dataset.dret);save();render();}}));
-  document.querySelectorAll('[data-ret-stok]').forEach(el=>el.addEventListener('click',()=>{S.returns=S.returns.map(x=>x.id===el.dataset.retStok?{...x,stokMasuk:true}:x);save();render();toast('Stok dikonfirmasi masuk kembali');}));
-  // modal overlay close
+  document.querySelectorAll('[data-retstok]').forEach(el=>el.addEventListener('click',()=>{S.returns=S.returns.map(x=>x.id===el.dataset.retstok?{...x,stokMasuk:true}:x);save();render();toast('Stok dikonfirmasi masuk');}));
+  // overlay
   document.getElementById('mOv')?.addEventListener('click',e=>{if(e.target.id==='mOv'){S.modal=null;render();}});
   // export/import
   document.getElementById('bExp')?.addEventListener('click',()=>{
-    const keys=['products','stockIn','stockOut','suppliers','customers','expenses','returns'];
+    const keys=['products','purchases','sales','suppliers','customers','expenses','returns','purchaseOrders'];
     const d=JSON.stringify(Object.fromEntries(keys.map(k=>[k,S[k]])),null,2);
     const a=document.createElement('a');a.href='data:application/json,'+encodeURIComponent(d);
-    a.download='hwtools-v2-'+today()+'.json';a.click();toast('Data diekspor');
+    a.download='hwtools-v21-'+today()+'.json';a.click();toast('Data diekspor');
   });
   document.getElementById('bImp')?.addEventListener('change',e=>{
     const f=e.target.files[0];if(!f)return;
     const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);
-      ['products','stockIn','stockOut','suppliers','customers','expenses','returns'].forEach(k=>{
-        if(d[k])S[k]=[...S[k],...d[k].filter(x=>!S[k].find(y=>y.id===x.id))];
-      });save();render();toast('Import berhasil!');}catch(e){alert('File tidak valid');}};r.readAsText(f);
+      ['products','purchases','sales','suppliers','customers','expenses','returns','purchaseOrders'].forEach(k=>{
+        if(d[k])S[k]=[...S[k],...d[k].filter(x=>!S[k].find(y=>y.id===x.id))];});
+      save();render();toast('Import berhasil!');}catch(e){alert('File tidak valid');}};r.readAsText(f);
   });
 }
 
-// ── MODAL BINDINGS ────────────────────────────────────
 function bm(){
   document.getElementById('bCl')?.addEventListener('click',()=>{S.modal=null;render();});
   document.getElementById('bCl2')?.addEventListener('click',()=>{S.modal=null;render();});
 
-  // PRODUK SAVE
+  // PRODUK
   document.getElementById('bSvP')?.addEventListener('click',function(){
     const id=this.dataset.id,br=document.getElementById('fBr').value;
     const sku=document.getElementById('fSk').value.trim().toUpperCase(),nama=document.getElementById('fNm').value.trim();
@@ -837,20 +1150,42 @@ function bm(){
     save();S.modal=null;render();toast(id?'Produk diperbarui':'Produk ditambahkan');
   });
 
-  // STOK MASUK — multi SKU
-  bindItemsIn();
-  document.getElementById('bSvI')?.addEventListener('click',()=>{
-    const tg=document.getElementById('fTg').value,inv=document.getElementById('fIn').value,supId=document.getElementById('fSup').value;
-    if(!tg){alert('Tanggal wajib diisi');return;}
-    const items=collectItemsIn();
-    if(!items.length){alert('Tambahkan minimal 1 SKU');return;}
-    if(items.some(i=>!i.sku)){alert('Semua baris harus dipilih SKU-nya');return;}
-    S.stockIn.push({id:uid(),tgl:tg,inv,supId,items});
-    save();S.modal=null;render();toast('Stok masuk dicatat');
+  // PO
+  bindPOItems();
+  document.getElementById('fCurr')?.addEventListener('change',()=>{updatePOTotal();updateBuyTotal();});
+  document.getElementById('fRate')?.addEventListener('input',()=>{updatePOTotal();updateBuyTotal();});
+  document.getElementById('bSvPO')?.addEventListener('click',function(){
+    const id=this.dataset.id;
+    const tgl=document.getElementById('fTg').value,noPO=document.getElementById('fNoPO').value;
+    const supId=document.getElementById('fSup').value,status=document.getElementById('fStatus').value;
+    const curr=document.getElementById('fCurr').value,rate=parseFloat(document.getElementById('fRate').value)||1;
+    const note=document.getElementById('fNote').value,items=collectPO();
+    if(!tgl){alert('Tanggal wajib diisi');return;}
+    if(!items.length||items.some(i=>!i.sku)){alert('Lengkapi semua item SKU');return;}
+    const rec={tgl,noPO,supId,status,curr,rate,note,items};
+    if(id){S.purchaseOrders=S.purchaseOrders.map(x=>x.id===id?{...x,...rec}:x);toast('PO diperbarui');}
+    else{S.purchaseOrders.push({id:uid(),...rec});toast('PO dibuat');}
+    save();S.modal=null;render();
   });
 
-  // STOK KELUAR — multi SKU + edit
-  bindItemsOut();
+  // PEMBELIAN
+  bindBuyItems();
+  document.getElementById('bSvBuy')?.addEventListener('click',function(){
+    const id=this.dataset.id;
+    const tgl=document.getElementById('fTg').value,inv=document.getElementById('fIn').value;
+    const supId=document.getElementById('fSup').value;
+    const curr=document.getElementById('fCurr').value,rate=parseFloat(document.getElementById('fRate').value)||1;
+    const items=collectBuy().map(i=>({...i,hargaNetIDR:i.hargaNetAsli*rate,totalIDR:i.totalAsli*rate}));
+    if(!tgl){alert('Tanggal wajib diisi');return;}
+    if(!items.length||items.some(i=>!i.sku)){alert('Lengkapi semua item SKU');return;}
+    if(id){const old=S.purchases.find(x=>x.id===id);
+      S.purchases=S.purchases.map(x=>x.id===id?{...x,tgl,inv,supId,curr,rate,items}:x);toast('Pembelian diperbarui');}
+    else{S.purchases.push({id:uid(),tgl,inv,supId,curr,rate,items,payTerm:'cash',payments:[],payStatus:'outstanding'});toast('Pembelian dicatat');}
+    save();S.modal=null;render();
+  });
+
+  // PENJUALAN
+  bindSellItems();
   document.getElementById('fPt')?.addEventListener('change',e=>{
     const tr=document.getElementById('termRow');if(tr)tr.style.display=e.target.value==='credit'?'':'none';
   });
@@ -858,61 +1193,82 @@ function bm(){
     const tg=document.getElementById('fTg').value;
     if(tg&&e.target.value){const d=new Date(tg);d.setDate(d.getDate()+parseInt(e.target.value));const jt=document.getElementById('fJt');if(jt)jt.value=d.toISOString().slice(0,10);}
   });
-  document.getElementById('bSvO')?.addEventListener('click',function(){
+  document.getElementById('fFee')?.addEventListener('input',updateSellSummary);
+  document.getElementById('fOngkir')?.addEventListener('input',updateSellSummary);
+  document.getElementById('bSvSell')?.addEventListener('click',function(){
     const id=this.dataset.id;
-    const tg=document.getElementById('fTg').value,inv=document.getElementById('fIn').value;
+    const tgl=document.getElementById('fTg').value,inv=document.getElementById('fIn').value;
     const custId=document.getElementById('fCust').value,ch=document.getElementById('fCh').value;
     const fee=parseFloat(document.getElementById('fFee').value)||0;
-    const payTerm=document.getElementById('fPt').value,termDays=parseInt(document.getElementById('fTermDays')?.value||0);
+    const ongkir=parseFloat(document.getElementById('fOngkir').value)||0;
+    const payTerm=document.getElementById('fPt').value;
+    const termDays=parseInt(document.getElementById('fTermDays')?.value||0);
     const jatuhTempo=document.getElementById('fJt')?.value||'';
-    if(!tg){alert('Tanggal wajib diisi');return;}
-    const items=collectItemsOut();
-    if(!items.length){alert('Tambahkan minimal 1 SKU');return;}
-    if(items.some(i=>!i.sku)){alert('Semua baris harus dipilih SKU-nya');return;}
-    const gross=items.reduce((a,i)=>a+i.total,0),neto=gross-fee;
-    const rec={tgl:tg,inv,custId,ch,fee,payTerm,termDays,jatuhTempo,items,neto,payStatus:payTerm==='cash'?'paid':'outstanding',payments:payTerm==='cash'?[]:[],gross};
-    if(id){S.stockOut=S.stockOut.map(x=>x.id===id?{...x,...rec}:x);toast('Penjualan diperbarui');}
-    else{S.stockOut.push({id:uid(),...rec});toast('Penjualan dicatat');}
+    const items=collectSell();
+    if(!tgl){alert('Tanggal wajib diisi');return;}
+    if(!items.length||items.some(i=>!i.sku)){alert('Lengkapi semua item SKU');return;}
+    if(id){const old=S.sales.find(x=>x.id===id);
+      S.sales=S.sales.map(x=>x.id===id?{...x,tgl,inv,custId,ch,fee,ongkir,payTerm,termDays,jatuhTempo,items}:x);toast('Penjualan diperbarui');}
+    else{S.sales.push({id:uid(),tgl,inv,custId,ch,fee,ongkir,payTerm,termDays,jatuhTempo,items,payStatus:payTerm==='cash'?'paid':'outstanding',payments:[],danaStatus:ch==='Online'?'tertahan':'cair'});toast('Penjualan dicatat');}
     save();S.modal=null;render();
   });
 
-  // PAYMENT SAVE
-  document.getElementById('bSvPay')?.addEventListener('click',function(){
+  // PAYMENT SELL
+  document.getElementById('bSvPaySell')?.addEventListener('click',function(){
     const id=this.dataset.id,tg=document.getElementById('fTg').value;
     const met=document.getElementById('fMet').value,amt=parseFloat(document.getElementById('fAmt').value)||0;
     const note=document.getElementById('fNote').value;
     if(!amt){alert('Jumlah bayar wajib diisi');return;}
-    S.stockOut=S.stockOut.map(x=>{
-      if(x.id!==id)return x;
-      const payments=[...(x.payments||[]),{id:uid(),tgl:tg,met,amount:amt,note}];
-      const paid=payments.reduce((a,p)=>a+p.amount,0);
-      const payStatus=paid>=x.neto?'paid':paid>0?'partial':'outstanding';
-      return{...x,payments,payStatus};
+    S.sales=S.sales.map(x=>{if(x.id!==id)return x;
+      const payments=[...(x.payments||[]),{id:uid(),tgl:tg,met,amount:amt,amountIDR:amt,note}];
+      const paid=payments.reduce((a,p)=>a+(p.amountIDR||p.amount),0);
+      return{...x,payments,payStatus:paid>=saleNeto(x)?'paid':paid>0?'partial':'outstanding'};
     });
     save();S.modal=null;render();toast('Pembayaran dicatat');
   });
 
-  // SUPPLIER SAVE
+  // PAYMENT BUY (multi currency)
+  const updPayBuyIDR=()=>{
+    const amt=parseFloat(document.getElementById('fAmt')?.value)||0;
+    const rate=parseFloat(document.getElementById('fRate')?.value)||1;
+    const el=document.getElementById('payBuyIDR');if(el)el.textContent=rp(amt*rate);
+  };
+  document.getElementById('fAmt')?.addEventListener('input',updPayBuyIDR);
+  document.getElementById('fRate')?.addEventListener('input',updPayBuyIDR);
+  document.getElementById('bSvPayBuy')?.addEventListener('click',function(){
+    const id=this.dataset.id,tg=document.getElementById('fTg').value;
+    const met=document.getElementById('fMet').value,curr=document.getElementById('fCurr').value;
+    const rate=parseFloat(document.getElementById('fRate').value)||1;
+    const amt=parseFloat(document.getElementById('fAmt').value)||0;
+    const note=document.getElementById('fNote').value;
+    if(!amt){alert('Jumlah bayar wajib diisi');return;}
+    S.purchases=S.purchases.map(x=>{if(x.id!==id)return x;
+      const payments=[...(x.payments||[]),{id:uid(),tgl:tg,met,curr,rate,amount:amt,amountIDR:amt*rate,note}];
+      const paid=payments.reduce((a,p)=>a+(p.amountIDR||p.amount),0);
+      return{...x,payments,payStatus:paid>=purchaseTotalIDR(x)?'paid':paid>0?'partial':'outstanding'};
+    });
+    save();S.modal=null;render();toast('Pembayaran ke supplier dicatat');
+  });
+
+  // SUPPLIER
   document.getElementById('bSvSup')?.addEventListener('click',function(){
     const id=this.dataset.id,nama=document.getElementById('fNm').value.trim();
     if(!nama){alert('Nama supplier wajib diisi');return;}
     const rec={nama,pic:document.getElementById('fPic').value,telp:document.getElementById('fTelp').value,email:document.getElementById('fEmail').value,alamat:document.getElementById('fAlamat').value,npwp:document.getElementById('fNpwp').value,note:document.getElementById('fNote').value};
-    if(id){S.suppliers=S.suppliers.map(x=>x.id===id?{...x,...rec}:x);}
-    else S.suppliers.push({id:uid(),...rec});
+    if(id){S.suppliers=S.suppliers.map(x=>x.id===id?{...x,...rec}:x);}else S.suppliers.push({id:uid(),...rec});
     save();S.modal=null;render();toast(id?'Supplier diperbarui':'Supplier ditambahkan');
   });
 
-  // CUSTOMER SAVE
+  // CUSTOMER
   document.getElementById('bSvCust')?.addEventListener('click',function(){
     const id=this.dataset.id,nama=document.getElementById('fNm').value.trim();
     if(!nama){alert('Nama customer wajib diisi');return;}
-    const rec={nama,tipe:document.getElementById('fTipe').value,pic:document.getElementById('fPic').value,telp:document.getElementById('fTelp').value,email:document.getElementById('fEmail').value,npwp:document.getElementById('fNpwp').value,alamat:document.getElementById('fAlamat').value,creditLimit:parseFloat(document.getElementById('fCl').value)||0,note:document.getElementById('fNote').value};
-    if(id){S.customers=S.customers.map(x=>x.id===id?{...x,...rec}:x);}
-    else S.customers.push({id:uid(),...rec});
+    const rec={nama,tipe:document.getElementById('fTipe').value,pic:document.getElementById('fPic').value,telp:document.getElementById('fTelp').value,email:document.getElementById('fEmail').value,npwp:document.getElementById('fNpwp').value,alamat:document.getElementById('fAlamat').value,note:document.getElementById('fNote').value};
+    if(id){S.customers=S.customers.map(x=>x.id===id?{...x,...rec}:x);}else S.customers.push({id:uid(),...rec});
     save();S.modal=null;render();toast(id?'Customer diperbarui':'Customer ditambahkan');
   });
 
-  // BIAYA SAVE
+  // BIAYA
   document.getElementById('bSvExp')?.addEventListener('click',()=>{
     const tg=document.getElementById('fTg').value,cat=document.getElementById('fCat').value;
     const desc=document.getElementById('fDesc').value,jml=parseFloat(document.getElementById('fJml').value)||0;
@@ -922,7 +1278,7 @@ function bm(){
     save();S.modal=null;render();toast('Biaya dicatat');
   });
 
-  // RETUR SAVE
+  // RETUR
   document.getElementById('bSvRet')?.addEventListener('click',()=>{
     const tg=document.getElementById('fTg').value,tipe=document.getElementById('fTipe').value;
     const sku=document.getElementById('fSkRet').value,qt=parseFloat(document.getElementById('fQt').value)||1;
@@ -935,77 +1291,54 @@ function bm(){
   });
 }
 
-// ── ITEM LINE HELPERS ─────────────────────────────────
-function collectItemsIn(){
-  const lines=document.querySelectorAll('#itemList .sku-line');
-  return [...lines].map(line=>{
-    const idx=line.dataset.idx;
-    const sku=line.querySelector('.iSku').value;
-    const hl=parseFloat(line.querySelector('.iHl').value)||0;
-    const disc=parseFloat(line.querySelector('.iDc').value)||0;
-    const qty=parseFloat(line.querySelector('.iQt').value)||1;
-    const hn=hl*(1-disc/100);const total=hn*qty;
-    const p=S.products.find(x=>x.sku===sku);
-    return{id:uid(),sku,nama:p?.nama||'',brand:p?.brand||'',hl,disc,hn,qty,total};
+function bindPOItems(){
+  const list=document.getElementById('itemListPO');if(!list)return;
+  document.getElementById('bAddItemPO')?.addEventListener('click',()=>{
+    const div=document.createElement('div');div.innerHTML=skuLinePO({id:uid(),sku:'',qty:1,hargaAsli:0,total:0},list.children.length);
+    list.appendChild(div.firstElementChild);bindPOLine(list.lastElementChild);
   });
+  [...list.children].forEach(l=>bindPOLine(l));
 }
-function collectItemsOut(){
-  const lines=document.querySelectorAll('#itemListO .sku-line');
-  return [...lines].map(line=>{
-    const sku=line.querySelector('.oSku').value;
-    const hj=parseFloat(line.querySelector('.oHj').value)||0;
-    const disc=parseFloat(line.querySelector('.oDc').value)||0;
-    const qty=parseFloat(line.querySelector('.oQt').value)||1;
-    const hjNet=hj*(1-disc/100);const total=hjNet*qty;
-    const p=S.products.find(x=>x.sku===sku);
-    const s=sku?stats(sku):{avg:0};
-    return{id:uid(),sku,nama:p?.nama||'',brand:p?.brand||'',hj:hjNet,disc,qty,total,hpp:s.avg};
-  });
-}
-function updateInTotal(){
-  const items=collectItemsIn();
-  const el=document.getElementById('fGrandTotal');
-  if(el)el.textContent=rp(items.reduce((a,i)=>a+i.total,0));
-}
-function updateOutSummary(){
-  const items=collectItemsOut();
-  const fee=parseFloat(document.getElementById('fFee')?.value)||0;
-  const el=document.getElementById('outSummary');
-  if(el)el.innerHTML=calcOutSummary(items,fee);
-}
-function bindItemsIn(){
-  const list=document.getElementById('itemList');if(!list)return;
-  document.getElementById('bAddItem')?.addEventListener('click',()=>{
-    const idx=list.querySelectorAll('.sku-line').length;
-    const div=document.createElement('div');div.innerHTML=skuLineIn({id:uid(),sku:'',qty:1,hl:0,disc:0,hn:0,total:0},idx);
-    list.appendChild(div.firstElementChild);bindLineIn(list.lastElementChild);
-  });
-  list.querySelectorAll('.sku-line').forEach(line=>bindLineIn(line));
-}
-function bindLineIn(line){
-  line.querySelectorAll('.iHl,.iDc,.iQt').forEach(el=>el.addEventListener('input',()=>{
-    const hl=parseFloat(line.querySelector('.iHl').value)||0,dc=parseFloat(line.querySelector('.iDc').value)||0,qt=parseFloat(line.querySelector('.iQt').value)||1;
-    const hn=hl*(1-dc/100);line.querySelector('.iHn').value=Math.round(hn);line.querySelector('.iTot').value=Math.round(hn*qt);updateInTotal();
+function bindPOLine(l){
+  l.querySelectorAll('.poHarga,.poQty').forEach(el=>el.addEventListener('input',()=>{
+    const h=parseFloat(l.querySelector('.poHarga').value)||0,q=parseFloat(l.querySelector('.poQty').value)||1;
+    l.querySelector('.poTot').value=Math.round(h*q);updatePOTotal();
   }));
-  line.querySelector('.removeItem')?.addEventListener('click',()=>{line.remove();updateInTotal();});
+  l.querySelector('.poRem')?.addEventListener('click',()=>{l.remove();updatePOTotal();});
+  updatePOTotal();
 }
-function bindItemsOut(){
-  const list=document.getElementById('itemListO');if(!list)return;
-  document.getElementById('bAddItemO')?.addEventListener('click',()=>{
-    const idx=list.querySelectorAll('.sku-line').length;
-    const div=document.createElement('div');div.innerHTML=skuLineOut({id:uid(),sku:'',qty:1,hj:0,disc:0,total:0},idx);
-    list.appendChild(div.firstElementChild);bindLineOut(list.lastElementChild);
+function bindBuyItems(){
+  const list=document.getElementById('itemListBuy');if(!list)return;
+  document.getElementById('bAddItemBuy')?.addEventListener('click',()=>{
+    const div=document.createElement('div');div.innerHTML=skuLineBuy({id:uid(),sku:'',qty:1,hargaListAsli:0,disc:0,hargaNetAsli:0,totalAsli:0},list.children.length);
+    list.appendChild(div.firstElementChild);bindBuyLine(list.lastElementChild);
   });
-  list.querySelectorAll('.sku-line').forEach(line=>bindLineOut(line));
-  document.getElementById('fFee')?.addEventListener('input',updateOutSummary);
+  [...list.children].forEach(l=>bindBuyLine(l));
 }
-function bindLineOut(line){
-  line.querySelectorAll('.oHj,.oDc,.oQt').forEach(el=>el.addEventListener('input',()=>{
-    const hj=parseFloat(line.querySelector('.oHj').value)||0,dc=parseFloat(line.querySelector('.oDc').value)||0,qt=parseFloat(line.querySelector('.oQt').value)||1;
-    const hjNet=hj*(1-dc/100);line.querySelector('.oTot').value=Math.round(hjNet*qt);updateOutSummary();
+function bindBuyLine(l){
+  l.querySelectorAll('.byHl,.byDc,.byQt').forEach(el=>el.addEventListener('input',()=>{
+    const hl=parseFloat(l.querySelector('.byHl').value)||0,dc=parseFloat(l.querySelector('.byDc').value)||0,q=parseFloat(l.querySelector('.byQt').value)||1;
+    const hn=hl*(1-dc/100);l.querySelector('.byHn').value=Math.round(hn);l.querySelector('.byTot').value=Math.round(hn*q);updateBuyTotal();
   }));
-  line.querySelector('.oSku')?.addEventListener('change',updateOutSummary);
-  line.querySelector('.removeItemO')?.addEventListener('click',()=>{line.remove();updateOutSummary();});
+  l.querySelector('.byRem')?.addEventListener('click',()=>{l.remove();updateBuyTotal();});
+  updateBuyTotal();
+}
+function bindSellItems(){
+  const list=document.getElementById('itemListSell');if(!list)return;
+  document.getElementById('bAddItemSell')?.addEventListener('click',()=>{
+    const div=document.createElement('div');div.innerHTML=skuLineSell({id:uid(),sku:'',qty:1,hj:0,disc:0,total:0},list.children.length);
+    list.appendChild(div.firstElementChild);bindSellLine(list.lastElementChild);
+  });
+  [...list.children].forEach(l=>bindSellLine(l));
+}
+function bindSellLine(l){
+  l.querySelectorAll('.slHj,.slDc,.slQt').forEach(el=>el.addEventListener('input',()=>{
+    const hj=parseFloat(l.querySelector('.slHj').value)||0,dc=parseFloat(l.querySelector('.slDc').value)||0,q=parseFloat(l.querySelector('.slQt').value)||1;
+    const hjn=hj*(1-dc/100);l.querySelector('.slTot').value=Math.round(hjn*q);updateSellSummary();
+  }));
+  l.querySelector('.slSku')?.addEventListener('change',updateSellSummary);
+  l.querySelector('.slRem')?.addEventListener('click',()=>{l.remove();updateSellSummary();});
+  updateSellSummary();
 }
 
 load();render();
