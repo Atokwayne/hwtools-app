@@ -128,21 +128,31 @@ function stats(sku){
   const p=S.products.find(x=>x.sku===sku);if(!p)return{stokBagus:0,stokKaratan:0,avg:0};
   const tIn=S.purchases.reduce((a,inv)=>a+(inv.items||[]).filter(x=>x.sku===sku).reduce((b,x)=>b+x.qty,0),0);
   const tOut=S.sales.reduce((a,inv)=>a+(inv.items||[]).filter(x=>x.sku===sku).reduce((b,x)=>b+x.qty,0),0);
-  const tRet=S.returns.filter(x=>x.stokMasuk&&x.sku===sku).reduce((a,x)=>a+x.qty,0);
-  const stokBagus=Math.max(0,(p.sb||0)+tIn-tOut+tRet);
+  // retur penjualan yang dikonfirmasi = stok masuk kembali (+)
+  const tRetIn=S.returns.filter(x=>x.stokMasuk&&x.sku===sku&&(x.jenisRetur||'penjualan')==='penjualan').reduce((a,x)=>a+x.qty,0);
+  // retur pembelian yang dikonfirmasi = stok keluar (-)
+  const tRetOut=S.returns.filter(x=>x.stokMasuk&&x.sku===sku&&x.jenisRetur==='pembelian').reduce((a,x)=>a+x.qty,0);
+  const stokBagus=Math.max(0,(p.sb||0)+tIn-tOut+tRetIn-tRetOut);
   let q=p.sb||0,v=(p.m||0)*q;
   S.purchases.forEach(inv=>(inv.items||[]).filter(x=>x.sku===sku).forEach(x=>{q+=x.qty;v+=(x.hnIDR||x.hn||0)*x.qty;}));
   return{stokBagus,stokKaratan:p.sk||0,avg:q>0?v/q:p.m||0};
 }
 function nilaiTotal(){return S.products.reduce((a,p)=>{const s=stats(p.sku);return a+s.stokBagus*s.avg;},0);}
 // laba per invoice penjualan
+function returnsForSale(saleId){
+  return S.returns.filter(x=>(x.jenisRetur||'penjualan')==='penjualan'&&x.refSaleId===saleId).reduce((a,x)=>a+(x.nilaiRetur||0),0);
+}
+function returnsForPurchase(buyId){
+  return S.returns.filter(x=>x.jenisRetur==='pembelian'&&x.refBuyId===buyId).reduce((a,x)=>a+(x.nilaiRetur||0),0);
+}
 function saleProfit(sale){
   const hppTotal=(sale.items||[]).reduce((a,i)=>a+(i.hpp||0)*i.qty,0);
   const gross=(sale.items||[]).reduce((a,i)=>a+i.total,0);
   const fee=sale.fee||0, ongkir=sale.ongkir||0;
-  const neto=gross-fee;
+  const retur=returnsForSale(sale.id);
+  const neto=gross-fee-retur;
   const labaKotor=neto-hppTotal-ongkir;
-  return{gross,fee,ongkir,neto,hppTotal,labaKotor,margin:neto>0?labaKotor/neto:0};
+  return{gross,fee,ongkir,retur,neto,hppTotal,labaKotor,margin:neto>0?labaKotor/neto:0};
 }
 function saleNeto(sale){return saleProfit(sale).neto;}
 function metricsPenjualan(period,yr,mo){
@@ -171,18 +181,20 @@ function getCustomerPiutang(cid){
   },0);
 }
 function getUtangTotal(){
-  return S.purchases.filter(x=>x.payStatus!=='paid').reduce((a,x)=>{
+  const buyUtang=S.purchases.filter(x=>x.payStatus!=='paid').reduce((a,x)=>{
     const totalIDR=(x.items||[]).reduce((b,i)=>b+(i.totalIDR||i.total||0),0);
     const paid=(x.payments||[]).reduce((b,p)=>b+(p.amountIDR||p.amount),0);
     return a+(totalIDR-paid);
   },0);
+  const expUtang=S.expenses.filter(x=>x.payStatus==='belum').reduce((a,x)=>a+x.jumlah,0);
+  return buyUtang+expUtang;
 }
-function purchaseTotalIDR(p){return (p.items||[]).reduce((a,i)=>a+(i.totalIDR||i.total||0),0);}
+function purchaseTotalIDR(p){return (p.items||[]).reduce((a,i)=>a+(i.totalIDR||i.total||0),0)-returnsForPurchase(p.id);}
 function danaTertahanTotal(){
   return S.sales.filter(x=>x.ch==='Online'&&x.danaStatus==='tertahan').reduce((a,x)=>a+saleNeto(x),0);
 }
 // ═══ LAYOUT ═══
-const PAGES={dashboard:'Dashboard',analisis:'Analisis Bisnis',labarugi:'Laporan Laba Rugi',produk:'Data Produk',po:'Purchase Order',pembelian:'Pembelian',penjualan:'Penjualan',rekap:'Rekap per Brand',retur:'Retur',piutang:'Piutang Customer',utang:'Utang Supplier',biaya:'Pencatatan Biaya',supplier:'Database Supplier',customer:'Database Customer'};
+const PAGES={dashboard:'Dashboard',analisis:'Analisis Bisnis',labarugi:'Laporan Laba Rugi',reminder:'Reminder Jatuh Tempo',produk:'Data Produk',po:'Purchase Order',pembelian:'Pembelian',penjualan:'Penjualan',rekap:'Rekap per Brand',retur:'Retur',piutang:'Piutang Customer',utang:'Hutang Supplier',biaya:'Pencatatan Biaya',supplier:'Database Supplier',customer:'Database Customer'};
 function render(){document.getElementById('app').innerHTML=layout();bind();}
 function renderContent(){const c=document.querySelector('.content');if(c){c.innerHTML=page();bind();}else render();}
 function navI(icon,lbl,pg){return`<div class="ni${S.page===pg?' active':''}" data-nav="${pg}"><i class="ti ti-${icon}"></i>${lbl}</div>`;}
@@ -205,6 +217,7 @@ function layout(){
       ${navI('dashboard','Dashboard','dashboard')}
       ${navI('chart-bar','Analisis Bisnis','analisis')}
       ${navI('report-money','Laba Rugi','labarugi')}
+      ${navI('bell','Reminder Jatuh Tempo','reminder')}
       <div class="nl">Inventaris</div>
       ${navI('package','Data Produk','produk')}
       ${navI('rekap','Rekap per Brand','rekap')}
@@ -212,7 +225,7 @@ function layout(){
       <div class="nl">Pembelian</div>
       ${navI('file-text','Purchase Order','po')}
       ${navI('arrow-bar-to-down','Pembelian','pembelian')}
-      ${navI('building-warehouse','Utang Supplier','utang')}
+      ${navI('building-warehouse','Hutang Supplier','utang')}
       <div class="nl">Penjualan</div>
       ${navI('arrow-bar-up','Penjualan','penjualan')}
       ${navI('credit-card','Piutang Customer','piutang')}
@@ -234,7 +247,7 @@ function layout(){
   </div>${S.modal?modal():''}`;
 }
 function page(){
-  const m={dashboard:pgDash,analisis:pgAn,labarugi:pgLR,produk:pgProd,po:pgPO,pembelian:pgBuy,penjualan:pgSell,rekap:pgRekap,retur:pgRetur,piutang:pgPiutang,utang:pgUtang,biaya:pgBiaya,supplier:pgSup,customer:pgCust};
+  const m={dashboard:pgDash,analisis:pgAn,labarugi:pgLR,reminder:pgReminder,produk:pgProd,po:pgPO,pembelian:pgBuy,penjualan:pgSell,rekap:pgRekap,retur:pgRetur,piutang:pgPiutang,utang:pgUtang,biaya:pgBiaya,supplier:pgSup,customer:pgCust};
   return (m[S.page]||(()=>''))();
 }
 
@@ -249,7 +262,7 @@ function pgDash(){
     <div class="met"><div class="ml">Laba Kotor Bulan Ini</div><div class="mv ${m.laba>=0?'g':'r'}">${rp(m.laba)}</div><div class="ms">${pct(m.mp)} margin</div></div>
     <div class="met"><div class="ml">Nilai Stok (Modal)</div><div class="mv o">${rp(ns)}</div><div class="ms">${fmt(st)} pcs · ${sk} SKU</div></div>
     <div class="met"><div class="ml">Piutang Customer</div><div class="mv r">${rp(piutang)}</div><div class="ms">belum dibayar</div></div>
-    <div class="met"><div class="ml">Utang Supplier</div><div class="mv r">${rp(utang)}</div><div class="ms">belum dibayar</div></div>
+    <div class="met"><div class="ml">Hutang Supplier</div><div class="mv r">${rp(utang)}</div><div class="ms">belum dibayar</div></div>
     <div class="met"><div class="ml">Dana Tertahan Marketplace</div><div class="mv o">${rp(tertahan)}</div><div class="ms">belum cair</div></div>
   </div>
   <div class="two">
@@ -274,7 +287,24 @@ function pgDash(){
         <td>${sup?sup.nama:'—'}</td><td class="rt">${rp(purchaseTotalIDR(x))}</td></tr>`;
     }).join('')}</tbody></table>`}
     </div>
-  </div>`;
+  </div>
+  ${(()=>{
+    const rem=getReminders();
+    const urgent=rem.filter(r=>r.days<=7);
+    if(!urgent.length)return'';
+    return`<div class="card" style="border-color:#F7C1C1">
+      <div class="card-t" style="color:var(--err)"><i class="ti ti-bell"></i> Reminder Jatuh Tempo — Perlu Perhatian</div>
+      <table><thead><tr><th>Jenis</th><th>Pihak</th><th>Invoice</th><th>Jatuh Tempo</th><th>Status</th><th class="rt">Nilai</th></tr></thead><tbody>
+      ${urgent.slice(0,8).map(r=>{
+        const badge=r.days<0?`<span class="pay-badge outstanding">Lewat ${Math.abs(r.days)} hari</span>`:
+          r.days===0?`<span class="pay-badge tertahan">Hari ini</span>`:`<span class="pay-badge partial">${r.days} hari lagi</span>`;
+        return`<tr><td><span class="bdg ${r.jenis==='Piutang'?'bb':'bo'}">${r.jenis}</span></td>
+          <td>${r.pihak}</td><td><span class="chip">${r.inv}</span></td>
+          <td class="nw">${fd(r.tgl)}</td><td>${badge}</td><td class="rt r"><strong>${rp(r.sisa)}</strong></td></tr>`;
+      }).join('')}</tbody></table>
+      ${urgent.length>8?`<div class="tm" style="font-size:11px;margin-top:8px">+${urgent.length-8} tagihan lainnya — lihat halaman Reminder Jatuh Tempo</div>`:''}
+    </div>`;
+  })()}`;
 }
 // ═══ ANALISIS ═══
 function pgAn(){
@@ -351,13 +381,14 @@ function pgLR(){
   <div class="card" style="max-width:560px">
     <div class="card-t">Laporan Laba Rugi — ${S.fp==='monthly'?MO[S.fm]+' ':''}${S.fy}</div>
     <div class="lr-row head"><span>Keterangan</span><span>Jumlah</span></div>
-    <div class="lr-row"><span><strong>Pendapatan Penjualan (Neto)</strong></span><span><strong>${rp(m.omz)}</strong></span></div>
-    <div class="lr-row sub"><span>Harga Pokok Penjualan (HPP)</span><span>(${rp(m.hpp)})</span></div>
+    <div class="lr-row" data-lr="omzet" style="cursor:pointer"><span><strong>Pendapatan Penjualan (Neto)</strong> <i class="ti ti-zoom-in" style="font-size:12px;color:var(--acc)"></i></span><span><strong>${rp(m.omz)}</strong></span></div>
+    <div class="lr-row sub" data-lr="hpp" style="cursor:pointer"><span>Harga Pokok Penjualan (HPP) <i class="ti ti-zoom-in" style="font-size:11px;color:var(--acc)"></i></span><span>(${rp(m.hpp)})</span></div>
     <div class="lr-row total"><span>Laba Kotor</span><span class="${m.laba>=0?'g':'r'}">${rp(m.laba)}</span></div>
     <div class="lr-row head" style="margin-top:8px"><span>Biaya Operasional</span><span></span></div>
-    ${EXPENSE_CATS.map(c=>`<div class="lr-row sub"><span>${c}</span><span>(${rp(expByCat[c])})</span></div>`).join('')}
+    ${EXPENSE_CATS.map(c=>`<div class="lr-row sub" data-lr="exp:${c}" style="cursor:pointer"><span>${c} <i class="ti ti-zoom-in" style="font-size:11px;color:var(--acc)"></i></span><span>(${rp(expByCat[c])})</span></div>`).join('')}
     <div class="lr-row total"><span>Total Biaya Operasional</span><span class="r">(${rp(totalBiaya)})</span></div>
     <div class="lr-row total" style="font-size:15px"><span>LABA BERSIH</span><span class="${labaBersih>=0?'g':'r'}">${rp(labaBersih)}</span></div>
+    <div class="tm" style="font-size:11px;padding:8px 12px">Klik baris dengan ikon kaca pembesar untuk melihat rincian angka.</div>
   </div>
   <div class="card">
     <div class="card-t">Laba Kotor per Invoice Penjualan</div>
@@ -371,6 +402,62 @@ function pgLR(){
     </tbody></table></div>`}
   </div>`;
 }
+// ═══ REMINDER JATUH TEMPO ═══
+function getReminders(){
+  const now=new Date();now.setHours(0,0,0,0);
+  const items=[];
+  // piutang customer dengan jatuh tempo
+  S.sales.filter(x=>x.payTerm==='credit'&&x.jatuhTempo).forEach(x=>{
+    const paid=(x.payments||[]).reduce((a,p)=>a+(p.amountIDR||p.amount),0);
+    const sisa=saleNeto(x)-paid;
+    if(sisa<=0)return;
+    const jt=new Date(x.jatuhTempo);jt.setHours(0,0,0,0);
+    const days=Math.round((jt-now)/86400000);
+    const c=S.customers.find(cc=>cc.id===x.custId);
+    items.push({jenis:'Piutang',pihak:c?c.nama:'(Customer)',inv:x.inv||'—',tgl:x.jatuhTempo,sisa,days,refId:x.id,refType:'sale'});
+  });
+  // hutang biaya dengan jatuh tempo
+  S.expenses.filter(x=>x.payStatus==='belum'&&x.jatuhTempo).forEach(x=>{
+    const jt=new Date(x.jatuhTempo);jt.setHours(0,0,0,0);
+    const days=Math.round((jt-now)/86400000);
+    const s=S.suppliers.find(ss=>ss.id===x.supId);
+    items.push({jenis:'Hutang Biaya',pihak:s?s.nama:'(Supplier)',inv:x.invNo||'—',tgl:x.jatuhTempo,sisa:x.jumlah,days,refId:x.id,refType:'exp'});
+  });
+  return items.sort((a,b)=>a.days-b.days);
+}
+function pgReminder(){
+  const rem=getReminders();
+  const overdue=rem.filter(r=>r.days<0);
+  const soon=rem.filter(r=>r.days>=0&&r.days<=7);
+  const later=rem.filter(r=>r.days>7);
+  const totOverdue=overdue.reduce((a,r)=>a+r.sisa,0);
+  const totSoon=soon.reduce((a,r)=>a+r.sisa,0);
+  const remRow=r=>{
+    const badge=r.days<0?`<span class="pay-badge outstanding">Lewat ${Math.abs(r.days)} hari</span>`:
+      r.days===0?`<span class="pay-badge tertahan">Hari ini</span>`:
+      `<span class="pay-badge ${r.days<=7?'partial':'paid'}">${r.days} hari lagi</span>`;
+    return `<tr><td><span class="bdg ${r.jenis==='Piutang'?'bb':'bo'}">${r.jenis}</span></td>
+      <td>${r.pihak}</td><td><span class="chip">${r.inv}</span></td>
+      <td class="nw">${fd(r.tgl)}</td><td>${badge}</td>
+      <td class="rt r"><strong>${rp(r.sisa)}</strong></td></tr>`;
+  };
+  const tbl=(title,arr,emptyMsg)=>`<div class="card" style="padding:0;overflow:hidden">
+    <div style="padding:10px 16px;border-bottom:1px solid var(--bd);background:#FAFBFC"><strong style="font-size:12px">${title}</strong></div>
+    <div class="tw" style="border:none;border-radius:0"><table><thead><tr><th>Jenis</th><th>Pihak</th><th>Invoice</th><th>Jatuh Tempo</th><th>Status</th><th class="rt">Nilai</th></tr></thead><tbody>
+    ${!arr.length?`<tr><td colspan="6"><div class="empty" style="padding:20px"><p>${emptyMsg}</p></div></td></tr>`:arr.map(remRow).join('')}
+    </tbody></table></div></div>`;
+  return`
+  <div class="mg">
+    <div class="met"><div class="ml">Sudah Lewat Tempo</div><div class="mv r">${rp(totOverdue)}</div><div class="ms">${overdue.length} tagihan overdue</div></div>
+    <div class="met"><div class="ml">Jatuh Tempo ≤ 7 Hari</div><div class="mv o">${rp(totSoon)}</div><div class="ms">${soon.length} tagihan</div></div>
+    <div class="met"><div class="ml">Akan Datang</div><div class="mv b">${rp(later.reduce((a,r)=>a+r.sisa,0))}</div><div class="ms">${later.length} tagihan</div></div>
+  </div>
+  ${tbl('⚠ SUDAH LEWAT JATUH TEMPO',overdue,'Tidak ada tagihan yang lewat tempo')}
+  ${tbl('JATUH TEMPO DALAM 7 HARI',soon,'Tidak ada tagihan jatuh tempo minggu ini')}
+  ${tbl('AKAN DATANG (> 7 HARI)',later,'Tidak ada tagihan mendatang')}
+  <div class="tm" style="font-size:11px;margin-top:8px">Catatan: Reminder muncul untuk piutang penjualan (Credit Term) dan hutang biaya yang punya tanggal jatuh tempo.</div>`;
+}
+
 // ═══ DATA PRODUK ═══
 function pgProd(){
   const fl=S.products.filter(p=>{
@@ -521,19 +608,28 @@ function pgRekap(){
 
 // ═══ RETUR ═══
 function pgRetur(){
-  const fl=S.returns.filter(x=>!S.q||x.sku?.toLowerCase().includes(S.q.toLowerCase())||x.invRef?.toLowerCase().includes(S.q.toLowerCase()));
-  return`<div class="fb"><input id="iQ" placeholder="Cari SKU / invoice..." value="${S.q}"></div>
-  <div class="tw"><table><thead><tr><th>Tanggal</th><th>Tipe</th><th>SKU</th><th>Nama</th><th>Invoice Ref</th><th class="rt">Qty</th><th>Alasan</th><th>Stok Masuk?</th><th></th></tr></thead><tbody>
-  ${!fl.length?`<tr><td colspan="9"><div class="empty"><i class="ti ti-package-off"></i><p>Belum ada data retur</p></div></td></tr>`:
-  [...fl].reverse().map(x=>`<tr>
-    <td class="nw">${fd(x.tgl)}</td><td><span class="bdg ${x.tipe==='Online'?'bb':'bx'}">${x.tipe}</span></td>
+  const fl=S.returns.filter(x=>!S.q||x.sku?.toLowerCase().includes(S.q.toLowerCase())||x.nama?.toLowerCase().includes(S.q.toLowerCase()));
+  const invName=x=>{
+    if((x.jenisRetur||'penjualan')==='penjualan'){const s=S.sales.find(ss=>ss.id===x.refSaleId);return s?s.inv:'—';}
+    const b=S.purchases.find(bb=>bb.id===x.refBuyId);return b?b.inv:'—';
+  };
+  return`<div class="fb"><input id="iQ" placeholder="Cari SKU / nama..." value="${S.q}"></div>
+  <div class="tw"><table><thead><tr><th>Tanggal</th><th>Jenis</th><th>SKU</th><th>Nama</th><th>Invoice Terkait</th><th class="rt">Qty</th><th class="rt">Nilai Retur</th><th>Alasan</th><th>Status Stok</th><th></th></tr></thead><tbody>
+  ${!fl.length?`<tr><td colspan="10"><div class="empty"><i class="ti ti-package-off"></i><p>Belum ada data retur</p></div></td></tr>`:
+  [...fl].reverse().map(x=>{
+    const jenis=x.jenisRetur||'penjualan';
+    return`<tr>
+    <td class="nw">${fd(x.tgl)}</td>
+    <td><span class="bdg ${jenis==='penjualan'?'bb':'bo'}">${jenis==='penjualan'?'Penjualan':'Pembelian'}</span></td>
     <td><span class="chip">${x.sku}</span></td><td>${x.nama||'—'}</td>
-    <td>${x.invRef?`<span class="chip">${x.invRef}</span>`:'—'}</td>
-    <td class="rt">${fmt(x.qty)}</td><td>${x.alasan||'—'}</td>
-    <td><span class="bdg ${x.stokMasuk?'bg2':'br'}">${x.stokMasuk?'Ya':'Tidak'}</span>
+    <td><span class="chip">${invName(x)}</span></td>
+    <td class="rt">${fmt(x.qty)}</td>
+    <td class="rt r">${rp(x.nilaiRetur||0)}</td>
+    <td>${x.alasan||'—'}</td>
+    <td><span class="bdg ${x.stokMasuk?'bg2':'br'}">${x.stokMasuk?'Dikonfirmasi':'Belum'}</span>
       ${!x.stokMasuk?`<button class="btn btn-sm btn-ok" style="margin-left:4px" data-retstok="${x.id}">Konfirmasi</button>`:''}</td>
     <td style="white-space:nowrap"><button class="btn btn-ic btn-sm" data-eret="${x.id}"><i class="ti ti-edit"></i></button> <button class="btn btn-ic btn-sm btn-d" data-dret="${x.id}"><i class="ti ti-trash"></i></button></td>
-  </tr>`).join('')}
+  </tr>`;}).join('')}
   </tbody></table></div>`;
 }
 
@@ -566,26 +662,63 @@ function pgPiutang(){
 
 // ═══ UTANG ═══
 function pgUtang(){
-  const out=S.purchases.filter(x=>{if(x.payStatus==='paid')return false;const paid=(x.payments||[]).reduce((a,p)=>a+(p.amountIDR||p.amount),0);return paid<purchaseTotalIDR(x);});
-  const tot=out.reduce((a,x)=>{const paid=(x.payments||[]).reduce((b,p)=>b+(p.amountIDR||p.amount),0);return a+(purchaseTotalIDR(x)-paid);},0);
+  // hutang dari pembelian
+  const buyOut=S.purchases.filter(x=>{if(x.payStatus==='paid')return false;const paid=(x.payments||[]).reduce((a,p)=>a+(p.amountIDR||p.amount),0);return paid<purchaseTotalIDR(x);});
+  // hutang dari biaya yang belum lunas
+  const expOut=S.expenses.filter(x=>x.payStatus==='belum');
+  const totBuy=buyOut.reduce((a,x)=>{const paid=(x.payments||[]).reduce((b,p)=>b+(p.amountIDR||p.amount),0);return a+(purchaseTotalIDR(x)-paid);},0);
+  const totExp=expOut.reduce((a,x)=>a+x.jumlah,0);
+  const tot=totBuy+totExp;
+  // rollup per supplier
+  const supRollup={};
+  buyOut.forEach(x=>{const paid=(x.payments||[]).reduce((b,p)=>b+(p.amountIDR||p.amount),0);const sisa=purchaseTotalIDR(x)-paid;
+    const key=x.supId||'_none';if(!supRollup[key])supRollup[key]={count:0,total:0};supRollup[key].count++;supRollup[key].total+=sisa;});
+  expOut.forEach(x=>{const key=x.supId||'_none';if(!supRollup[key])supRollup[key]={count:0,total:0};supRollup[key].count++;supRollup[key].total+=x.jumlah;});
   return`
   <div class="mg">
-    <div class="met"><div class="ml">Total Utang Supplier</div><div class="mv r">${rp(tot)}</div><div class="ms">${out.length} invoice</div></div>
-    <div class="met"><div class="ml">Supplier dengan Utang</div><div class="mv">${[...new Set(out.map(x=>x.supId).filter(Boolean))].length}</div></div>
+    <div class="met"><div class="ml">Total Hutang Supplier</div><div class="mv r">${rp(tot)}</div><div class="ms">${buyOut.length+expOut.length} tagihan</div></div>
+    <div class="met"><div class="ml">Hutang Pembelian</div><div class="mv r">${rp(totBuy)}</div><div class="ms">${buyOut.length} invoice</div></div>
+    <div class="met"><div class="ml">Hutang Biaya</div><div class="mv r">${rp(totExp)}</div><div class="ms">${expOut.length} biaya belum lunas</div></div>
   </div>
-  <div class="tw"><table><thead><tr><th>Tanggal</th><th>Invoice</th><th>Supplier</th><th>Mata Uang</th><th class="rt">Nilai (IDR)</th><th class="rt">Dibayar</th><th class="rt">Sisa</th><th></th></tr></thead><tbody>
-  ${!out.length?`<tr><td colspan="8"><div class="empty"><i class="ti ti-circle-check"></i><p>Tidak ada utang outstanding</p></div></td></tr>`:
-  out.map(x=>{
-    const s=S.suppliers.find(ss=>ss.id===x.supId);
-    const paid=(x.payments||[]).reduce((a,p)=>a+(p.amountIDR||p.amount),0);
-    const tIDR=purchaseTotalIDR(x),sisa=tIDR-paid;
-    return`<tr><td class="nw">${fd(x.tgl)}</td><td><span class="chip">${x.inv||'—'}</span></td>
-      <td>${s?s.nama:'—'}</td><td>${x.curr}${x.curr!=='IDR'?` @${fmt(x.rate)}`:''}</td>
-      <td class="rt">${rp(tIDR)}</td><td class="rt g">${rp(paid)}</td>
-      <td class="rt r"><strong>${rp(sisa)}</strong></td>
-      <td><button class="btn btn-ic btn-sm btn-ok" data-paybuy="${x.id}"><i class="ti ti-cash"></i></button></td></tr>`;
-  }).join('')}
-  </tbody></table></div>`;
+  <div class="card" style="padding:0;overflow:hidden">
+    <div style="padding:10px 16px;border-bottom:1px solid var(--bd);background:#FAFBFC"><strong style="font-size:12px">REKAP PER SUPPLIER — Total Invoice Belum Dibayar</strong></div>
+    <div class="tw" style="border:none;border-radius:0"><table><thead><tr><th>Supplier</th><th class="rt">Jumlah Tagihan</th><th class="rt">Total Belum Dibayar</th></tr></thead><tbody>
+    ${Object.keys(supRollup).length===0?`<tr><td colspan="3"><div class="empty" style="padding:20px"><p>Tidak ada hutang</p></div></td></tr>`:
+    Object.entries(supRollup).sort((a,b)=>b[1].total-a[1].total).map(([k,v])=>{
+      const s=S.suppliers.find(ss=>ss.id===k);
+      return`<tr><td><strong>${s?s.nama:'(Tanpa Supplier)'}</strong></td><td class="rt">${v.count} tagihan</td><td class="rt r"><strong>${rp(v.total)}</strong></td></tr>`;
+    }).join('')}
+    </tbody></table></div>
+  </div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <div style="padding:10px 16px;border-bottom:1px solid var(--bd);background:#FAFBFC"><strong style="font-size:12px">RINCIAN HUTANG PEMBELIAN</strong></div>
+    <div class="tw" style="border:none;border-radius:0"><table><thead><tr><th>Tanggal</th><th>Invoice</th><th>Supplier</th><th>Mata Uang</th><th class="rt">Nilai (IDR)</th><th class="rt">Dibayar</th><th class="rt">Sisa</th><th></th></tr></thead><tbody>
+    ${!buyOut.length?`<tr><td colspan="8"><div class="empty" style="padding:20px"><i class="ti ti-circle-check"></i><p>Tidak ada hutang pembelian</p></div></td></tr>`:
+    buyOut.map(x=>{
+      const s=S.suppliers.find(ss=>ss.id===x.supId);
+      const paid=(x.payments||[]).reduce((a,p)=>a+(p.amountIDR||p.amount),0);
+      const tIDR=purchaseTotalIDR(x),sisa=tIDR-paid;
+      return`<tr><td class="nw">${fd(x.tgl)}</td><td><span class="chip">${x.inv||'—'}</span></td>
+        <td>${s?s.nama:'—'}</td><td>${x.curr}${x.curr!=='IDR'?` @${fmt(x.rate)}`:''}</td>
+        <td class="rt">${rp(tIDR)}</td><td class="rt g">${rp(paid)}</td>
+        <td class="rt r"><strong>${rp(sisa)}</strong></td>
+        <td><button class="btn btn-ic btn-sm btn-ok" data-paybuy="${x.id}"><i class="ti ti-cash"></i></button></td></tr>`;
+    }).join('')}
+    </tbody></table></div>
+  </div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <div style="padding:10px 16px;border-bottom:1px solid var(--bd);background:#FAFBFC"><strong style="font-size:12px">RINCIAN HUTANG BIAYA (Belum Lunas)</strong></div>
+    <div class="tw" style="border:none;border-radius:0"><table><thead><tr><th>Tanggal</th><th>No. Invoice/Nota</th><th>Kategori</th><th>Supplier</th><th>Deskripsi</th><th class="rt">Jumlah</th><th></th></tr></thead><tbody>
+    ${!expOut.length?`<tr><td colspan="7"><div class="empty" style="padding:20px"><i class="ti ti-circle-check"></i><p>Tidak ada hutang biaya</p></div></td></tr>`:
+    expOut.map(x=>{
+      const s=S.suppliers.find(ss=>ss.id===x.supId);
+      return`<tr><td class="nw">${fd(x.tgl)}</td><td>${x.invNo?`<span class="chip">${x.invNo}</span>`:'—'}</td>
+        <td><span class="bdg bo">${x.cat}</span></td><td>${s?s.nama:'—'}</td><td>${x.deskripsi||'—'}</td>
+        <td class="rt r"><strong>${rp(x.jumlah)}</strong></td>
+        <td><button class="btn btn-sm btn-ok" data-explunas="${x.id}">Tandai Lunas</button></td></tr>`;
+    }).join('')}
+    </tbody></table></div>
+  </div>`;
 }
 
 // ═══ BIAYA ═══
@@ -875,6 +1008,7 @@ function modal(){
   // BIAYA
   if(type==='exp'){
     const isEdit=!!d.id;
+    const supOpts=S.suppliers.map(s=>`<option value="${s.id}" ${d.supId===s.id?'selected':''}>${s.nama}</option>`).join('');
     return`<div class="ov" id="mOv"><div class="modal">
     <div class="mh"><h3>${isEdit?'Edit Biaya':'Catat Biaya'}</h3><button class="btn btn-ic" id="bCl"><i class="ti ti-x"></i></button></div>
     <div class="mb">
@@ -882,11 +1016,13 @@ function modal(){
       <div><label>Kategori</label><select id="fCat">${EXPENSE_CATS.map(c=>`<option value="${c}" ${d.cat===c?'selected':''}>${c}</option>`).join('')}</select></div></div>
       <div class="fr"><label>Deskripsi</label><input id="fDesc" value="${d.deskripsi||''}" placeholder="Keterangan biaya..."></div>
       <div class="fr c2"><div><label>Jumlah (Rp)</label><input id="fJml" type="number" value="${d.jumlah||0}" min="0"></div>
-      <div><label>No. Invoice / Nota (Opsional)</label><input id="fInvNo" value="${d.invNo||''}" placeholder="INV-XXX / Nota-XXX"></div></div>
-      <div class="fr c2"><div><label>Status Pembayaran</label><select id="fPayStatus">
+      <div><label>Supplier / Vendor (Opsional)</label><select id="fSupExp"><option value="">— Tidak ada —</option>${supOpts}</select></div></div>
+      <div class="fr c2"><div><label>No. Invoice / Nota (Opsional)</label><input id="fInvNo" value="${d.invNo||''}" placeholder="INV-XXX / Nota-XXX"></div>
+      <div><label>Status Pembayaran</label><select id="fPayStatus">
         <option value="lunas" ${d.payStatus!=='belum'?'selected':''}>Lunas</option>
-        <option value="belum" ${d.payStatus==='belum'?'selected':''}>Belum Dibayar</option>
-      </select></div>
+        <option value="belum" ${d.payStatus==='belum'?'selected':''}>Belum Dibayar (jadi Hutang Supplier)</option>
+      </select></div></div>
+      <div class="fr c2"><div><label>Tgl Jatuh Tempo (jika belum lunas, opsional)</label><input id="fJtExp" type="date" value="${d.jatuhTempo||''}"></div>
       <div><label>Kaitkan ke Invoice Transaksi (Opsional)</label><select id="fInvRef"><option value="">— Tidak —</option>${[...S.purchases.map(x=>x.inv),...S.sales.map(x=>x.inv)].filter(Boolean).map(i=>`<option value="${i}" ${d.invRef===i?'selected':''}>${i}</option>`).join('')}</select></div></div>
     </div>
     <div class="mf"><button class="btn" id="bCl2">Batal</button><button class="btn btn-p" id="bSvExp" data-id="${d.id||''}">Simpan</button></div>
@@ -896,22 +1032,81 @@ function modal(){
   // RETUR
   if(type==='ret'){
     const isEdit=!!d.id;
+    const jenisRetur=d.jenisRetur||'penjualan';
     const skuOpts=S.products.map(p=>`<option value="${p.sku}" ${d.sku===p.sku?'selected':''}>${p.sku} — ${p.nama}</option>`).join('');
+    const saleOpts=S.sales.filter(x=>x.inv).map(x=>{const c=S.customers.find(cc=>cc.id===x.custId);return`<option value="${x.id}" ${d.refSaleId===x.id?'selected':''}>${x.inv} — ${c?c.nama:'(tanpa customer)'} — ${fd(x.tgl)}</option>`;}).join('');
+    const buyOpts=S.purchases.filter(x=>x.inv).map(x=>{const s=S.suppliers.find(ss=>ss.id===x.supId);return`<option value="${x.id}" ${d.refBuyId===x.id?'selected':''}>${x.inv} — ${s?s.nama:'(tanpa supplier)'} — ${fd(x.tgl)}</option>`;}).join('');
     return`<div class="ov" id="mOv"><div class="modal">
     <div class="mh"><h3>${isEdit?'Edit Retur':'Catat Retur'}</h3><button class="btn btn-ic" id="bCl"><i class="ti ti-x"></i></button></div>
     <div class="mb">
       <div class="fr c2"><div><label>Tanggal</label><input id="fTg" type="date" value="${d.tgl||today()}"></div>
-      <div><label>Tipe Retur</label><select id="fTipe"><option value="Online" ${d.tipe==='Online'?'selected':''}>Online</option><option value="Offline" ${d.tipe==='Offline'?'selected':''}>Offline</option></select></div></div>
+      <div><label>Jenis Retur</label><select id="fJenis">
+        <option value="penjualan" ${jenisRetur==='penjualan'?'selected':''}>Retur Penjualan (customer kembalikan)</option>
+        <option value="pembelian" ${jenisRetur==='pembelian'?'selected':''}>Retur Pembelian (kembalikan ke supplier)</option>
+      </select></div></div>
+      <div class="fr" id="refSaleRow" style="${jenisRetur==='penjualan'?'':'display:none'}">
+        <label>Pilih Invoice Penjualan</label>
+        <select id="fRefSale"><option value="">— Pilih Invoice Penjualan —</option>${saleOpts}</select></div>
+      <div class="fr" id="refBuyRow" style="${jenisRetur==='pembelian'?'':'display:none'}">
+        <label>Pilih Invoice Pembelian</label>
+        <select id="fRefBuy"><option value="">— Pilih Invoice Pembelian —</option>${buyOpts}</select></div>
       <div class="fr c2"><div><label>SKU Produk</label><select id="fSkRet"><option value="">— Pilih —</option>${skuOpts}</select></div>
       <div><label>Qty Retur</label><input id="fQt" type="number" value="${d.qty||1}" min="1"></div></div>
-      <div class="fr c2"><div><label>Invoice Referensi (Opsional)</label><input id="fInvRef" value="${d.invRef||''}" placeholder="INV-001"></div>
-      <div><label>Channel</label><input id="fCh" value="${d.ch||''}" placeholder="Tokopedia / Shopee"></div></div>
-      <div class="fr"><label>Alasan Retur</label><input id="fAlasan" value="${d.alasan||''}" placeholder="Barang rusak / salah kirim"></div>
+      <div class="fr c2"><div><label>Nilai Retur (Rp) — dipotong dari invoice terkait</label><input id="fNilai" type="number" value="${d.nilaiRetur||0}" min="0"></div>
+      <div><label>Alasan Retur</label><input id="fAlasan" value="${d.alasan||''}" placeholder="Barang rusak / salah kirim"></div></div>
       <div style="display:flex;align-items:center;gap:8px;padding:10px;background:#F5F6FA;border-radius:7px">
-        <input type="checkbox" id="fStokMasuk" ${d.stokMasuk?'checked':''}><label for="fStokMasuk" style="margin:0;cursor:pointer">Konfirmasi stok masuk kembali ke gudang sekarang</label>
+        <input type="checkbox" id="fStokMasuk" ${d.stokMasuk?'checked':''}><label for="fStokMasuk" style="margin:0;cursor:pointer">Konfirmasi pergerakan stok sekarang</label>
       </div>
+      <div class="tm" style="font-size:11px;margin-top:6px">Retur penjualan dikonfirmasi → stok kembali masuk gudang &amp; nilai dipotong dari piutang/omzet. Retur pembelian dikonfirmasi → stok keluar gudang &amp; nilai dipotong dari hutang.</div>
     </div>
     <div class="mf"><button class="btn" id="bCl2">Batal</button><button class="btn btn-p" id="bSvRet" data-id="${d.id||''}">Simpan</button></div>
+  </div></div>`;
+  }
+
+  // DRILL-DOWN LABA RUGI
+  if(type==='lrDetail'){
+    const {lrKey,fp,fy,fm}=d;
+    const inP=dt2=>{const dt=new Date(dt2);
+      if(fp==='monthly')return dt.getFullYear()===fy&&dt.getMonth()===fm;
+      if(fp==='quarterly')return dt.getFullYear()===fy&&Math.floor(dt.getMonth()/3)===Math.floor(fm/3);
+      if(fp==='semesterly')return dt.getFullYear()===fy&&(dt.getMonth()<6?0:1)===(fm<6?0:1);
+      return dt.getFullYear()===fy;
+    };
+    let judul='',rows='',total=0,headCols='';
+    if(lrKey==='omzet'){
+      judul='Rincian Pendapatan Penjualan (Neto)';
+      headCols='<th>Tanggal</th><th>Invoice</th><th>Customer</th><th>Channel</th><th class="rt">Neto</th>';
+      const salesP=S.sales.filter(x=>inP(x.tgl));
+      rows=salesP.map(s=>{const c=S.customers.find(cc=>cc.id===s.custId);const n=saleNeto(s);total+=n;
+        return`<tr><td class="nw">${fd(s.tgl)}</td><td><span class="chip">${s.inv||'—'}</span></td><td>${c?c.nama:'—'}</td><td>${s.ch||'—'}</td><td class="rt">${rp(n)}</td></tr>`;}).join('');
+      if(!salesP.length)rows=`<tr><td colspan="5"><div class="empty" style="padding:20px"><p>Tidak ada penjualan periode ini</p></div></td></tr>`;
+    }else if(lrKey==='hpp'){
+      judul='Rincian Harga Pokok Penjualan (HPP)';
+      headCols='<th>Tanggal</th><th>Invoice</th><th>SKU</th><th class="rt">Qty</th><th class="rt">HPP/unit</th><th class="rt">Total HPP</th>';
+      const salesP=S.sales.filter(x=>inP(x.tgl));
+      const arr=[];
+      salesP.forEach(s=>(s.items||[]).forEach(i=>{const t=(i.hpp||0)*i.qty;total+=t;
+        arr.push(`<tr><td class="nw">${fd(s.tgl)}</td><td><span class="chip">${s.inv||'—'}</span></td><td><span class="chip">${i.sku}</span></td><td class="rt">${fmt(i.qty)}</td><td class="rt">${rp(i.hpp||0)}</td><td class="rt">${rp(t)}</td></tr>`);}));
+      rows=arr.join('')||`<tr><td colspan="6"><div class="empty" style="padding:20px"><p>Tidak ada data HPP periode ini</p></div></td></tr>`;
+    }else if(lrKey.startsWith('exp:')){
+      const cat=lrKey.slice(4);
+      judul='Rincian Biaya — '+cat;
+      headCols='<th>Tanggal</th><th>No. Invoice/Nota</th><th>Supplier</th><th>Deskripsi</th><th>Status</th><th class="rt">Jumlah</th>';
+      const expP=S.expenses.filter(x=>inP(x.tgl)&&x.cat===cat);
+      rows=expP.map(x=>{const s=S.suppliers.find(ss=>ss.id===x.supId);total+=x.jumlah;
+        return`<tr><td class="nw">${fd(x.tgl)}</td><td>${x.invNo?`<span class="chip">${x.invNo}</span>`:'—'}</td><td>${s?s.nama:'—'}</td><td>${x.deskripsi||'—'}</td><td><span class="pay-badge ${x.payStatus==='belum'?'outstanding':'paid'}">${x.payStatus==='belum'?'Belum':'Lunas'}</span></td><td class="rt">${rp(x.jumlah)}</td></tr>`;}).join('');
+      if(!expP.length)rows=`<tr><td colspan="6"><div class="empty" style="padding:20px"><p>Tidak ada biaya ${cat} periode ini</p></div></td></tr>`;
+    }
+    const colspan=headCols.split('<th').length-1;
+    return`<div class="ov" id="mOv"><div class="modal modal-lg">
+    <div class="mh"><h3>${judul}</h3><button class="btn btn-ic" id="bCl"><i class="ti ti-x"></i></button></div>
+    <div class="mb">
+      <div class="ib">Periode: <strong>${fp==='monthly'?MO[fm]+' ':''}${fy}</strong></div>
+      <div class="tw"><table><thead><tr>${headCols}</tr></thead><tbody>${rows}
+        <tr style="background:#FAFBFC;font-weight:700"><td colspan="${colspan-1}" class="rt">TOTAL</td><td class="rt">${rp(total)}</td></tr>
+      </tbody></table></div>
+    </div>
+    <div class="mf"><button class="btn btn-p" id="bCl2">Tutup</button></div>
   </div></div>`;
   }
   return'';
@@ -1129,6 +1324,9 @@ function bind(){
   document.getElementById('bAddExp')?.addEventListener('click',()=>{S.modal={type:'exp',data:{}};render();bm();});
   document.getElementById('bAddRet')?.addEventListener('click',()=>{S.modal={type:'ret',data:{}};render();bm();});
   document.getElementById('bExpLR')?.addEventListener('click',exportLRxls);
+  document.querySelectorAll('[data-lr]').forEach(el=>el.addEventListener('click',()=>{
+    S.modal={type:'lrDetail',data:{lrKey:el.dataset.lr,fp:S.fp,fy:S.fy,fm:S.fm}};render();bm();
+  }));
   // produk
   document.querySelectorAll('[data-ep]').forEach(el=>el.addEventListener('click',()=>{const p=S.products.find(x=>x.id===el.dataset.ep);S.modal={type:'prod',data:{...p}};render();bm();}));
   document.querySelectorAll('[data-dp]').forEach(el=>el.addEventListener('click',()=>{if(confirm('Hapus produk ini?')){S.products=S.products.filter(x=>x.id!==el.dataset.dp);save();render();}}));
@@ -1170,6 +1368,7 @@ function bind(){
   document.querySelectorAll('[data-dcust]').forEach(el=>el.addEventListener('click',()=>{if(confirm('Hapus customer?')){S.customers=S.customers.filter(x=>x.id!==el.dataset.dcust);save();render();}}));
   // biaya/retur
   document.querySelectorAll('[data-dexp]').forEach(el=>el.addEventListener('click',()=>{if(confirm('Hapus biaya ini?')){S.expenses=S.expenses.filter(x=>x.id!==el.dataset.dexp);save();render();}}));
+  document.querySelectorAll('[data-explunas]').forEach(el=>el.addEventListener('click',()=>{S.expenses=S.expenses.map(x=>x.id===el.dataset.explunas?{...x,payStatus:'lunas'}:x);save();render();toast('Biaya ditandai lunas');}));
   document.querySelectorAll('[data-eexp]').forEach(el=>el.addEventListener('click',()=>{const x=S.expenses.find(e=>e.id===el.dataset.eexp);S.modal={type:'exp',data:{...x}};render();bm();}));
   document.querySelectorAll('[data-dret]').forEach(el=>el.addEventListener('click',()=>{if(confirm('Hapus retur ini?')){S.returns=S.returns.filter(x=>x.id!==el.dataset.dret);save();render();}}));
   document.querySelectorAll('[data-eret]').forEach(el=>el.addEventListener('click',()=>{const x=S.returns.find(r=>r.id===el.dataset.eret);S.modal={type:'ret',data:{...x}};render();bm();}));
@@ -1368,8 +1567,10 @@ function bm(){
     const invNo=document.getElementById('fInvNo').value;
     const payStatus=document.getElementById('fPayStatus').value;
     const invRef=document.getElementById('fInvRef').value;
+    const supId=document.getElementById('fSupExp').value;
+    const jatuhTempo=document.getElementById('fJtExp').value;
     if(!jml){alert('Jumlah wajib diisi');return;}
-    const rec={tgl:tg,cat,deskripsi:desc,jumlah:jml,invNo,payStatus,invRef};
+    const rec={tgl:tg,cat,deskripsi:desc,jumlah:jml,invNo,payStatus,invRef,supId,jatuhTempo};
     if(id){S.expenses=S.expenses.map(x=>x.id===id?{...x,...rec}:x);toast('Biaya diperbarui');}
     else{S.expenses.push({id:uid(),...rec});toast('Biaya dicatat');}
     save();S.modal=null;render();
@@ -1378,16 +1579,28 @@ function bm(){
   // RETUR
   document.getElementById('bSvRet')?.addEventListener('click',function(){
     const id=this.dataset.id;
-    const tg=document.getElementById('fTg').value,tipe=document.getElementById('fTipe').value;
+    const tg=document.getElementById('fTg').value;
+    const jenisRetur=document.getElementById('fJenis').value;
     const sku=document.getElementById('fSkRet').value,qt=parseFloat(document.getElementById('fQt').value)||1;
-    const invRef=document.getElementById('fInvRef').value,ch=document.getElementById('fCh').value;
+    const nilaiRetur=parseFloat(document.getElementById('fNilai').value)||0;
     const alasan=document.getElementById('fAlasan').value,stokMasuk=document.getElementById('fStokMasuk').checked;
+    const refSaleId=document.getElementById('fRefSale')?.value||'';
+    const refBuyId=document.getElementById('fRefBuy')?.value||'';
     if(!sku){alert('Pilih SKU produk');return;}
+    if(jenisRetur==='penjualan'&&!refSaleId){alert('Pilih invoice penjualan terkait');return;}
+    if(jenisRetur==='pembelian'&&!refBuyId){alert('Pilih invoice pembelian terkait');return;}
     const p=S.products.find(x=>x.sku===sku);
-    const rec={tgl:tg,tipe,sku,nama:p?.nama||'',qty:qt,invRef,ch,alasan,stokMasuk};
+    const rec={tgl:tg,jenisRetur,sku,nama:p?.nama||'',qty:qt,nilaiRetur,alasan,stokMasuk,refSaleId,refBuyId};
     if(id){S.returns=S.returns.map(x=>x.id===id?{...x,...rec}:x);toast('Retur diperbarui');}
     else{S.returns.push({id:uid(),...rec});toast('Retur dicatat');}
     save();S.modal=null;render();
+  });
+  // toggle row jenis retur
+  document.getElementById('fJenis')?.addEventListener('change',e=>{
+    const isJual=e.target.value==='penjualan';
+    const rs=document.getElementById('refSaleRow'),rb=document.getElementById('refBuyRow');
+    if(rs)rs.style.display=isJual?'':'none';
+    if(rb)rb.style.display=isJual?'none':'';
   });
 }
 
