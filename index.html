@@ -101,6 +101,7 @@ let S={
   products:[],purchases:[],sales:[],
   suppliers:[],customers:[],expenses:[],returns:[],purchaseOrders:[],
   fb:'',fp:'monthly',fy:new Date().getFullYear(),fm:new Date().getMonth(),q:'',
+  imp:null,
 };
 
 function load(){
@@ -200,10 +201,10 @@ function renderContent(){const c=document.querySelector('.content');if(c){c.inne
 function navI(icon,lbl,pg){return`<div class="ni${S.page===pg?' active':''}" data-nav="${pg}"><i class="ti ti-${icon}"></i>${lbl}</div>`;}
 function layout(){
   const HB={
-    produk:`<button class="btn btn-p" id="bAddP"><i class="ti ti-plus"></i> Tambah Produk</button>`,
+    produk:`<button class="btn" id="bImpProd"><i class="ti ti-file-import"></i> Import SKU</button><button class="btn btn-p" id="bAddP"><i class="ti ti-plus"></i> Tambah Produk</button>`,
     po:`<button class="btn btn-p" id="bAddPO"><i class="ti ti-plus"></i> Buat PO</button>`,
     pembelian:`<button class="btn btn-p" id="bAddBuy"><i class="ti ti-plus"></i> Catat Pembelian</button>`,
-    penjualan:`<button class="btn btn-p" id="bAddSell"><i class="ti ti-plus"></i> Catat Penjualan</button>`,
+    penjualan:`<button class="btn" id="bImpSell"><i class="ti ti-file-import"></i> Import Penjualan</button><button class="btn btn-p" id="bAddSell"><i class="ti ti-plus"></i> Catat Penjualan</button>`,
     supplier:`<button class="btn btn-p" id="bAddSup"><i class="ti ti-plus"></i> Tambah Supplier</button>`,
     customer:`<button class="btn btn-p" id="bAddCust"><i class="ti ti-plus"></i> Tambah Customer</button>`,
     biaya:`<button class="btn btn-p" id="bAddExp"><i class="ti ti-plus"></i> Catat Biaya</button>`,
@@ -1109,6 +1110,94 @@ function modal(){
     <div class="mf"><button class="btn btn-p" id="bCl2">Tutup</button></div>
   </div></div>`;
   }
+
+  // IMPORT MARKETPLACE (SKU & Penjualan)
+  if(type==='import'){
+    const imp=S.imp||{};
+    const mode=imp.mode||d.mode; // 'sku' atau 'sell'
+    const judul=mode==='sku'?'Import Data SKU / Produk':'Import Data Penjualan';
+    // FIELD yang perlu dipetakan
+    const FIELDS=mode==='sku'?[
+      {key:'sku',label:'SKU',wajib:true},
+      {key:'nama',label:'Nama Barang',wajib:true},
+      {key:'brand',label:'Brand',wajib:false},
+      {key:'modal',label:'Harga Modal',wajib:false},
+      {key:'stok',label:'Stok Awal Bagus',wajib:false},
+    ]:[
+      {key:'tgl',label:'Tanggal',wajib:true},
+      {key:'inv',label:'No. Invoice / Pesanan',wajib:true},
+      {key:'customer',label:'Nama Customer',wajib:false},
+      {key:'sku',label:'SKU Produk',wajib:true},
+      {key:'qty',label:'Qty',wajib:true},
+      {key:'harga',label:'Harga Jual / Satuan',wajib:true},
+      {key:'fee',label:'Total Fee Marketplace',wajib:false},
+      {key:'ongkir',label:'Biaya Kirim / Ongkir',wajib:false},
+    ];
+    // STEP 1: upload
+    if(!imp.rows){
+      return`<div class="ov" id="mOv"><div class="modal">
+      <div class="mh"><h3>${judul}</h3><button class="btn btn-ic" id="bCl"><i class="ti ti-x"></i></button></div>
+      <div class="mb">
+        <div class="ib">Langkah 1 dari 3 — Pilih file export dari marketplace (.xlsx atau .csv).</div>
+        <div style="border:2px dashed var(--bd);border-radius:10px;padding:32px;text-align:center">
+          <i class="ti ti-file-upload" style="font-size:36px;color:var(--t3)"></i>
+          <p style="margin:8px 0;font-size:13px;color:var(--t2)">Pilih file dari Tokopedia, Shopee, Lazada, atau marketplace lain</p>
+          <label class="btn btn-p" style="cursor:pointer;display:inline-flex"><i class="ti ti-upload"></i> Pilih File<input type="file" id="fImpFile" accept=".xlsx,.xls,.csv" style="display:none"></label>
+        </div>
+        ${mode==='sell'?`<div class="tm" style="font-size:11px;margin-top:10px">Catatan: Penjualan yang diimport akan diberi channel "Online" dan payment term "Cash". Bisa diedit setelah import.</div>`:`<div class="tm" style="font-size:11px;margin-top:10px">Catatan: Jika ada SKU yang sudah terdaftar, data akan ditimpa dengan yang baru.</div>`}
+      </div>
+      <div class="mf"><button class="btn" id="bCl2">Batal</button></div>
+    </div></div>`;
+    }
+    // STEP 2: mapping kolom
+    if(!imp.confirmed){
+      const headers=imp.headers||[];
+      const sample=imp.rows.slice(0,3);
+      return`<div class="ov" id="mOv"><div class="modal modal-lg">
+      <div class="mh"><h3>${judul}</h3><button class="btn btn-ic" id="bCl"><i class="ti ti-x"></i></button></div>
+      <div class="mb">
+        <div class="ib">Langkah 2 dari 3 — Cocokkan kolom file dengan data aplikasi. File terbaca <strong>${imp.rows.length} baris</strong>.</div>
+        <div class="tw" style="margin-bottom:14px"><table><thead><tr><th>Data Aplikasi</th><th>Kolom di File</th><th>Contoh Nilai</th></tr></thead><tbody>
+        ${FIELDS.map(f=>{
+          const cur=imp.map?imp.map[f.key]:'';
+          const sampleVal=cur&&sample.length?(sample[0][cur]??'—'):'—';
+          return`<tr>
+            <td><strong>${f.label}</strong>${f.wajib?' <span class="r">*</span>':''}</td>
+            <td><select class="impMap" data-field="${f.key}"><option value="">— Tidak dipetakan —</option>
+              ${headers.map(h=>`<option value="${h}" ${cur===h?'selected':''}>${h}</option>`).join('')}</select></td>
+            <td class="tm">${sampleVal}</td>
+          </tr>`;
+        }).join('')}
+        </tbody></table></div>
+        <div class="tm" style="font-size:11px">Field bertanda <span class="r">*</span> wajib dipetakan. Aplikasi mencoba menebak otomatis berdasarkan nama kolom.</div>
+      </div>
+      <div class="mf"><button class="btn" id="bImpBack">Kembali</button><button class="btn btn-p" id="bImpPreview">Lanjut — Preview</button></div>
+    </div></div>`;
+    }
+    // STEP 3: preview & konfirmasi
+    const parsed=imp.parsed||[];
+    const valid=parsed.filter(x=>x._valid);
+    const invalid=parsed.filter(x=>!x._valid);
+    return`<div class="ov" id="mOv"><div class="modal modal-lg">
+    <div class="mh"><h3>${judul}</h3><button class="btn btn-ic" id="bCl"><i class="ti ti-x"></i></button></div>
+    <div class="mb">
+      <div class="ib">Langkah 3 dari 3 — Preview hasil. <strong class="g">${valid.length} baris siap diimport</strong>${invalid.length?`, <strong class="r">${invalid.length} baris dilewati</strong> (data wajib kosong/tidak valid)`:''}.</div>
+      <div class="tw"><table><thead><tr>
+        ${mode==='sku'?'<th>Status</th><th>SKU</th><th>Nama</th><th>Brand</th><th class="rt">Modal</th><th class="rt">Stok</th>':'<th>Status</th><th>Tgl</th><th>Invoice</th><th>Customer</th><th>SKU</th><th class="rt">Qty</th><th class="rt">Harga</th>'}
+      </tr></thead><tbody>
+      ${parsed.slice(0,50).map(x=>{
+        const ok=x._valid;
+        const stBadge=ok?(x._dup?`<span class="pay-badge tertahan">Timpa</span>`:`<span class="pay-badge paid">Baru</span>`):`<span class="pay-badge outstanding">Dilewati</span>`;
+        if(mode==='sku')return`<tr style="${ok?'':'opacity:.5'}"><td>${stBadge}</td><td><span class="chip">${x.sku||'—'}</span></td><td>${x.nama||'—'}</td><td>${x.brand||'—'}</td><td class="rt">${x.modal?rp(x.modal):'—'}</td><td class="rt">${x.stok||0}</td></tr>`;
+        return`<tr style="${ok?'':'opacity:.5'}"><td>${stBadge}</td><td class="nw">${x.tgl||'—'}</td><td><span class="chip">${x.inv||'—'}</span></td><td>${x.customer||'—'}</td><td><span class="chip">${x.sku||'—'}</span></td><td class="rt">${x.qty||0}</td><td class="rt">${x.harga?rp(x.harga):'—'}</td></tr>`;
+      }).join('')}
+      </tbody></table></div>
+      ${parsed.length>50?`<div class="tm" style="font-size:11px;margin-top:8px">Menampilkan 50 baris pertama dari ${parsed.length} baris.</div>`:''}
+      ${mode==='sell'?`<div class="tm" style="font-size:11px;margin-top:8px">Baris penjualan dengan No. Invoice sama akan digabung menjadi satu invoice multi-SKU. Customer baru akan otomatis dibuat di database.</div>`:''}
+    </div>
+    <div class="mf"><button class="btn" id="bImpBack2">Kembali</button><button class="btn btn-p" id="bImpConfirm">Import ${valid.length} Baris</button></div>
+  </div></div>`;
+  }
   return'';
 }
 // ═══ SKU LINE HELPERS ═══
@@ -1298,6 +1387,159 @@ function exportLRxls(){
   const ws=XLSX.utils.aoa_to_sheet(data);const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'Laba Rugi');XLSX.writeFile(wb,`LabaRugi_${S.fy}.xlsx`);
 }
+// ═══ IMPORT LOGIC ═══
+function impGuessColumn(headers,keywords){
+  // tebak kolom berdasarkan kata kunci pada nama header
+  for(const h of headers){
+    const hl=String(h).toLowerCase();
+    if(keywords.some(k=>hl.includes(k)))return h;
+  }
+  return '';
+}
+function impAutoMap(mode,headers){
+  const map={};
+  if(mode==='sku'){
+    map.sku=impGuessColumn(headers,['sku','kode']);
+    map.nama=impGuessColumn(headers,['nama','product name','nama produk','nama barang']);
+    map.brand=impGuessColumn(headers,['brand','merek']);
+    map.modal=impGuessColumn(headers,['modal','hpp','harga beli','cost']);
+    map.stok=impGuessColumn(headers,['stok','stock','qty']);
+  }else{
+    map.tgl=impGuessColumn(headers,['tanggal','tgl','date','order date','waktu pesanan']);
+    map.inv=impGuessColumn(headers,['invoice','no. pesanan','nomor pesanan','order id','no pesanan','order sn']);
+    map.customer=impGuessColumn(headers,['customer','pembeli','buyer','nama pembeli','penerima']);
+    map.sku=impGuessColumn(headers,['sku','kode']);
+    map.qty=impGuessColumn(headers,['qty','jumlah','quantity','kuantitas']);
+    map.harga=impGuessColumn(headers,['harga','price','harga satuan','harga jual','unit price']);
+    map.fee=impGuessColumn(headers,['fee','biaya admin','admin','komisi','layanan']);
+    map.ongkir=impGuessColumn(headers,['ongkir','ongkos kirim','shipping','biaya kirim']);
+  }
+  return map;
+}
+function impParseFile(file,cb){
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      const data=new Uint8Array(ev.target.result);
+      const wb=XLSX.read(data,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+      if(!rows.length){alert('File kosong atau tidak terbaca');return;}
+      const headers=Object.keys(rows[0]);
+      cb(rows,headers);
+    }catch(e){alert('Gagal membaca file: '+e.message);}
+  };
+  reader.readAsArrayBuffer(file);
+}
+function impToNumber(v){
+  if(v==null||v==='')return 0;
+  if(typeof v==='number')return v;
+  let s=String(v).replace(/[^0-9,.-]/g,'').trim();
+  if(s==='')return 0;
+  const hasComma=s.includes(','),hasDot=s.includes('.');
+  if(hasComma&&hasDot){
+    // format Indonesia: titik=ribuan, koma=desimal  -> "1.234.567,89"
+    s=s.replace(/\./g,'').replace(',','.');
+  }else if(hasComma){
+    // hanya koma: anggap desimal "1234,56"
+    s=s.replace(',','.');
+  }else if(hasDot){
+    // hanya titik: bisa ribuan ("1.234.567") atau desimal ("1234.56")
+    const parts=s.split('.');
+    // jika ada >1 titik ATAU bagian terakhir bukan 1-2 digit -> titik = ribuan
+    if(parts.length>2||(parts.length===2&&parts[1].length===3)){
+      s=s.replace(/\./g,'');
+    }
+    // selain itu biarkan sebagai desimal
+  }
+  const n=parseFloat(s);
+  return isNaN(n)?0:n;
+}
+function impToDate(v){
+  if(!v)return '';
+  if(typeof v==='number'){
+    // serial date Excel
+    const d=new Date(Math.round((v-25569)*86400000));
+    return d.toISOString().slice(0,10);
+  }
+  const d=new Date(v);
+  if(!isNaN(d.getTime()))return d.toISOString().slice(0,10);
+  // coba format dd/mm/yyyy atau dd-mm-yyyy
+  const m=String(v).match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+  if(m){let y=m[3];if(y.length===2)y='20'+y;return `${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;}
+  return '';
+}
+function impParseRows(mode,rows,map){
+  return rows.map(row=>{
+    if(mode==='sku'){
+      const sku=String(row[map.sku]||'').trim().toUpperCase();
+      const nama=String(row[map.nama]||'').trim();
+      const brand=map.brand?String(row[map.brand]||'').trim():'';
+      const modal=map.modal?impToNumber(row[map.modal]):0;
+      const stok=map.stok?impToNumber(row[map.stok]):0;
+      const _valid=!!(sku&&nama);
+      const _dup=_valid&&S.products.some(p=>p.sku===sku);
+      // cocokkan brand ke daftar resmi (case-insensitive)
+      const brandMatch=BRANDS.find(b=>b.toLowerCase()===brand.toLowerCase())||(brand?BRANDS[BRANDS.length-1]:BRANDS[0]);
+      return{sku,nama,brand:brandMatch,modal,stok,_valid,_dup};
+    }else{
+      const tgl=map.tgl?impToDate(row[map.tgl]):'';
+      const inv=String(row[map.inv]||'').trim();
+      const customer=map.customer?String(row[map.customer]||'').trim():'';
+      const sku=String(row[map.sku]||'').trim().toUpperCase();
+      const qty=impToNumber(row[map.qty]);
+      const harga=impToNumber(row[map.harga]);
+      const fee=map.fee?impToNumber(row[map.fee]):0;
+      const ongkir=map.ongkir?impToNumber(row[map.ongkir]):0;
+      const _valid=!!(tgl&&inv&&sku&&qty>0&&harga>0);
+      return{tgl,inv,customer,sku,qty,harga,fee,ongkir,_valid};
+    }
+  });
+}
+function impCommitSKU(parsed){
+  let added=0,updated=0;
+  parsed.filter(x=>x._valid).forEach(x=>{
+    const existing=S.products.find(p=>p.sku===x.sku);
+    if(existing){
+      S.products=S.products.map(p=>p.id===existing.id?{...p,nama:x.nama,brand:x.brand,m:x.modal||p.m,sb:x.stok||p.sb}:p);
+      updated++;
+    }else{
+      S.products.push({id:uid(),sku:x.sku,nama:x.nama,brand:x.brand,m:x.modal,sb:x.stok,sk:0,foto:''});
+      added++;
+    }
+  });
+  return{added,updated};
+}
+function impCommitSell(parsed){
+  const valid=parsed.filter(x=>x._valid);
+  // kelompokkan baris berdasarkan No. Invoice
+  const groups={};
+  valid.forEach(x=>{if(!groups[x.inv])groups[x.inv]=[];groups[x.inv].push(x);});
+  let created=0,skipped=0;
+  Object.entries(groups).forEach(([inv,rows])=>{
+    // lewati jika invoice sudah ada
+    if(S.sales.some(s=>s.inv===inv)){skipped++;return;}
+    const first=rows[0];
+    // cari atau buat customer
+    let custId='';
+    if(first.customer){
+      let cust=S.customers.find(c=>c.nama.toLowerCase()===first.customer.toLowerCase());
+      if(!cust){cust={id:uid(),nama:first.customer,tipe:'Retail'};S.customers.push(cust);}
+      custId=cust.id;
+    }
+    const items=rows.map(r=>{
+      const p=S.products.find(pp=>pp.sku===r.sku);
+      const s=p?stats(r.sku):{avg:0};
+      return{id:uid(),sku:r.sku,nama:p?.nama||'',brand:p?.brand||'',hj:r.harga,disc:0,qty:r.qty,total:r.harga*r.qty,hpp:s.avg};
+    });
+    const fee=rows.reduce((a,r)=>a+(r.fee||0),0);
+    const ongkir=rows.reduce((a,r)=>a+(r.ongkir||0),0);
+    S.sales.push({id:uid(),tgl:first.tgl,inv,custId,ch:'Online',fee,ongkir,ppnOn:false,items,payTerm:'cash',payments:[],payStatus:'paid',danaStatus:'tertahan'});
+    created++;
+  });
+  return{created,skipped};
+}
+
 // ═══ EVENT BINDINGS ═══
 function bind(){
   document.querySelectorAll('[data-nav]').forEach(el=>el.addEventListener('click',()=>{S.page=el.dataset.nav;S.q='';S.fb='';render();}));
@@ -1316,6 +1558,8 @@ function bind(){
   document.getElementById('sFm')?.addEventListener('change',e=>{S.fm=parseInt(e.target.value);render();});
   // add buttons
   document.getElementById('bAddP')?.addEventListener('click',()=>{S.modal={type:'prod',data:{}};render();bm();});
+  document.getElementById('bImpProd')?.addEventListener('click',()=>{S.imp={mode:'sku'};S.modal={type:'import',data:{mode:'sku'}};render();bm();});
+  document.getElementById('bImpSell')?.addEventListener('click',()=>{S.imp={mode:'sell'};S.modal={type:'import',data:{mode:'sell'}};render();bm();});
   document.getElementById('bAddPO')?.addEventListener('click',()=>{S.modal={type:'po',data:{}};render();bm();});
   document.getElementById('bAddBuy')?.addEventListener('click',()=>{S.modal={type:'buy',data:{}};render();bm();});
   document.getElementById('bAddSell')?.addEventListener('click',()=>{S.modal={type:'sell',data:{}};render();bm();});
@@ -1392,8 +1636,53 @@ function bind(){
 }
 
 function bm(){
-  document.getElementById('bCl')?.addEventListener('click',()=>{S.modal=null;render();});
-  document.getElementById('bCl2')?.addEventListener('click',()=>{S.modal=null;render();});
+  document.getElementById('bCl')?.addEventListener('click',()=>{S.modal=null;S.imp=null;render();});
+  document.getElementById('bCl2')?.addEventListener('click',()=>{S.modal=null;S.imp=null;render();});
+
+  // ═══ IMPORT — STEP HANDLERS ═══
+  // step 1: file dipilih
+  document.getElementById('fImpFile')?.addEventListener('change',function(){
+    const file=this.files[0];if(!file)return;
+    impParseFile(file,(rows,headers)=>{
+      const mode=S.imp.mode;
+      S.imp={...S.imp,rows,headers,map:impAutoMap(mode,headers)};
+      render();bm();
+    });
+  });
+  // step 2: kembali ke step 1
+  document.getElementById('bImpBack')?.addEventListener('click',()=>{
+    S.imp={mode:S.imp.mode};render();bm();
+  });
+  // step 2: lanjut ke preview
+  document.getElementById('bImpPreview')?.addEventListener('click',()=>{
+    const mode=S.imp.mode;
+    const map={};
+    document.querySelectorAll('.impMap').forEach(sel=>{map[sel.dataset.field]=sel.value;});
+    // validasi field wajib
+    const wajib=mode==='sku'?['sku','nama']:['tgl','inv','sku','qty','harga'];
+    const kurang=wajib.filter(k=>!map[k]);
+    if(kurang.length){alert('Kolom wajib belum dipetakan: '+kurang.join(', '));return;}
+    const parsed=impParseRows(mode,S.imp.rows,map);
+    S.imp={...S.imp,map,parsed,confirmed:true};
+    render();bm();
+  });
+  // step 3: kembali ke step 2
+  document.getElementById('bImpBack2')?.addEventListener('click',()=>{
+    S.imp={...S.imp,confirmed:false,parsed:null};render();bm();
+  });
+  // step 3: konfirmasi import
+  document.getElementById('bImpConfirm')?.addEventListener('click',()=>{
+    const mode=S.imp.mode,parsed=S.imp.parsed;
+    if(mode==='sku'){
+      const r=impCommitSKU(parsed);
+      S.modal=null;S.imp=null;save();render();
+      toast(`Import selesai: ${r.added} produk baru, ${r.updated} ditimpa`);
+    }else{
+      const r=impCommitSell(parsed);
+      S.modal=null;S.imp=null;save();render();
+      toast(`Import selesai: ${r.created} invoice dibuat${r.skipped?', '+r.skipped+' invoice dilewati (sudah ada)':''}`);
+    }
+  });
 
   // PRODUK
   // handler upload foto + kompresi otomatis
