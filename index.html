@@ -927,22 +927,43 @@ function modal(){
     const inv=S.sales.find(x=>x.id===d.id)||{};
     const paid=(inv.payments||[]).reduce((a,p)=>a+(p.amountIDR||p.amount),0);
     const neto=saleNeto(inv),sisa=neto-paid;
+    const pct100=neto>0?Math.min(100,Math.round(paid/neto*100)):0;
     return`<div class="ov" id="mOv"><div class="modal">
     <div class="mh"><h3>Catat Pembayaran Customer</h3><button class="btn btn-ic" id="bCl"><i class="ti ti-x"></i></button></div>
     <div class="mb">
-      <div class="ib">Invoice <strong>${inv.inv||'—'}</strong> · Neto: <strong>${rp(neto)}</strong> · Dibayar: <strong class="g">${rp(paid)}</strong> · Sisa: <strong class="r">${rp(sisa)}</strong></div>
+      <div class="sb" style="margin-bottom:14px">
+        <div class="row"><span>Invoice</span><strong>${inv.inv||'—'}</strong></div>
+        <div class="row"><span>Total Neto Invoice</span><strong>${rp(neto)}</strong></div>
+        <div class="row"><span>Sudah Dibayar (${inv.payments?.length||0}× cicilan)</span><strong class="g">${rp(paid)}</strong></div>
+        <div class="row"><span>Sisa Belum Dibayar</span><strong class="r">${rp(sisa)}</strong></div>
+      </div>
+      <div style="margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:11px;color:var(--t2)">
+          <span>Progress Pelunasan</span><span>${pct100}%</span>
+        </div>
+        <div class="pb" style="height:8px"><div class="pbf" style="width:${pct100}%;background:${pct100>=100?'var(--ok)':'var(--acc)'}"></div></div>
+      </div>
+      ${sisa<=0?`<div style="padding:12px;background:var(--okl);border-radius:8px;color:var(--ok);font-weight:600;text-align:center;margin-bottom:14px"><i class="ti ti-circle-check"></i> Invoice ini sudah LUNAS</div>`:`
+      <div class="divider"></div>
+      <div style="font-size:12px;font-weight:700;color:var(--t2);margin-bottom:10px">TAMBAH CICILAN / PEMBAYARAN</div>
       <div class="fr c2">
         <div><label>Tanggal Bayar</label><input id="fTg" type="date" value="${today()}"></div>
         <div><label>Metode Pembayaran</label><select id="fMet">${PAY_METHODS.map(m=>`<option value="${m}">${m}</option>`).join('')}</select></div>
       </div>
-      <div class="fr"><label>Jumlah Bayar (Rp)</label><input id="fAmt" type="number" value="${sisa}" min="0"></div>
-      <div class="fr"><label>Catatan (Opsional)</label><input id="fNote" placeholder="Catatan..."></div>
-      ${(inv.payments||[]).length?`<div class="divider"></div><div style="font-size:11px;font-weight:700;color:var(--t2);margin-bottom:6px">RIWAYAT PEMBAYARAN</div>
-      <table><thead><tr><th>Tanggal</th><th>Metode</th><th class="rt">Jumlah</th><th>Catatan</th></tr></thead><tbody>
-      ${inv.payments.map(p=>`<tr><td>${fd(p.tgl)}</td><td>${p.met}</td><td class="rt g">${rp(p.amountIDR||p.amount)}</td><td>${p.note||'—'}</td></tr>`).join('')}
+      <div class="fr c2">
+        <div><label>Jumlah Bayar (Rp) <span class="tm">— bisa sebagian</span></label><input id="fAmt" type="number" value="${sisa}" min="0"></div>
+        <div><label>Catatan (Opsional)</label><input id="fNote" placeholder="Cicilan ke-${(inv.payments?.length||0)+1}..."></div>
+      </div>
+      <div style="padding:10px;background:var(--accl);border-radius:7px;font-size:12px">
+        Sisa setelah pembayaran ini: <strong id="sisaAfter">${rp(sisa)}</strong>
+      </div>`}
+      ${(inv.payments||[]).length?`<div class="divider"></div>
+      <div style="font-size:11px;font-weight:700;color:var(--t2);margin-bottom:6px">RIWAYAT CICILAN</div>
+      <table><thead><tr><th>#</th><th>Tanggal</th><th>Metode</th><th class="rt">Jumlah</th><th>Catatan</th></tr></thead><tbody>
+      ${inv.payments.map((p,i)=>`<tr><td class="tm">${i+1}</td><td>${fd(p.tgl)}</td><td>${p.met}</td><td class="rt g">${rp(p.amountIDR||p.amount)}</td><td>${p.note||'—'}</td></tr>`).join('')}
       </tbody></table>`:''}
     </div>
-    <div class="mf"><button class="btn" id="bCl2">Batal</button><button class="btn btn-p" id="bSvPaySell" data-id="${d.id}">Simpan Pembayaran</button></div>
+    <div class="mf"><button class="btn" id="bCl2">${sisa<=0?'Tutup':'Batal'}</button>${sisa>0?`<button class="btn btn-p" id="bSvPaySell" data-id="${d.id}">Simpan Pembayaran</button>`:''}</div>
   </div></div>`;
   }
 
@@ -1079,7 +1100,7 @@ function modal(){
       headCols='<th>Tanggal</th><th>Invoice</th><th>Customer</th><th>Channel</th><th class="rt">Neto</th>';
       const salesP=S.sales.filter(x=>inP(x.tgl));
       rows=salesP.map(s=>{const c=S.customers.find(cc=>cc.id===s.custId);const n=saleNeto(s);total+=n;
-        return`<tr><td class="nw">${fd(s.tgl)}</td><td><span class="chip">${s.inv||'—'}</span></td><td>${c?c.nama:'—'}</td><td>${s.ch||'—'}</td><td class="rt">${rp(n)}</td></tr>`;}).join('');
+        return`<tr><td class="nw">${fd(s.tgl)}</td><td><span class="chip" data-viewsale="${s.id}" style="cursor:pointer;color:var(--acc)" title="Lihat detail invoice">${s.inv||'—'} <i class="ti ti-external-link" style="font-size:9px"></i></span></td><td>${c?c.nama:'—'}</td><td>${s.ch||'—'}</td><td class="rt">${rp(n)}</td></tr>`;}).join('');
       if(!salesP.length)rows=`<tr><td colspan="5"><div class="empty" style="padding:20px"><p>Tidak ada penjualan periode ini</p></div></td></tr>`;
     }else if(lrKey==='hpp'){
       judul='Rincian Harga Pokok Penjualan (HPP)';
@@ -1087,7 +1108,7 @@ function modal(){
       const salesP=S.sales.filter(x=>inP(x.tgl));
       const arr=[];
       salesP.forEach(s=>(s.items||[]).forEach(i=>{const t=(i.hpp||0)*i.qty;total+=t;
-        arr.push(`<tr><td class="nw">${fd(s.tgl)}</td><td><span class="chip">${s.inv||'—'}</span></td><td><span class="chip">${i.sku}</span></td><td class="rt">${fmt(i.qty)}</td><td class="rt">${rp(i.hpp||0)}</td><td class="rt">${rp(t)}</td></tr>`);}));
+        arr.push(`<tr><td class="nw">${fd(s.tgl)}</td><td><span class="chip" data-viewsale="${s.id}" style="cursor:pointer;color:var(--acc)" title="Lihat detail invoice">${s.inv||'—'} <i class="ti ti-external-link" style="font-size:9px"></i></span></td><td><span class="chip">${i.sku}</span></td><td class="rt">${fmt(i.qty)}</td><td class="rt">${rp(i.hpp||0)}</td><td class="rt">${rp(t)}</td></tr>`);}));
       rows=arr.join('')||`<tr><td colspan="6"><div class="empty" style="padding:20px"><p>Tidak ada data HPP periode ini</p></div></td></tr>`;
     }else if(lrKey.startsWith('exp:')){
       const cat=lrKey.slice(4);
@@ -1196,6 +1217,49 @@ function modal(){
       ${mode==='sell'?`<div class="tm" style="font-size:11px;margin-top:8px">Baris penjualan dengan No. Invoice sama akan digabung menjadi satu invoice multi-SKU. Customer baru akan otomatis dibuat di database.</div>`:''}
     </div>
     <div class="mf"><button class="btn" id="bImpBack2">Kembali</button><button class="btn btn-p" id="bImpConfirm">Import ${valid.length} Baris</button></div>
+  </div></div>`;
+  }
+
+  // DETAIL INVOICE PENJUALAN (dari drill-down laba rugi)
+  if(type==='viewSale'){
+    const s=S.sales.find(x=>x.id===d.id)||{};
+    const cust=S.customers.find(c=>c.id===s.custId);
+    const pr=saleProfit(s);
+    const paid=(s.payments||[]).reduce((a,p)=>a+(p.amountIDR||p.amount),0);
+    const payStatus=paid>=pr.neto?'paid':paid>0?'partial':'outstanding';
+    return`<div class="ov" id="mOv"><div class="modal modal-lg">
+    <div class="mh"><h3>Detail Invoice — ${s.inv||'—'}</h3><button class="btn btn-ic" id="bCl"><i class="ti ti-x"></i></button></div>
+    <div class="mb">
+      <div class="fr c3" style="margin-bottom:14px">
+        <div><div class="tm" style="margin-bottom:3px">Tanggal</div><strong>${fd(s.tgl)}</strong></div>
+        <div><div class="tm" style="margin-bottom:3px">Customer</div><strong>${cust?cust.nama:'—'}</strong></div>
+        <div><div class="tm" style="margin-bottom:3px">Channel</div><strong>${s.ch||'—'}</strong></div>
+      </div>
+      <div class="tw" style="margin-bottom:14px"><table>
+        <thead><tr><th>SKU</th><th>Nama Barang</th><th class="rt">Harga</th><th class="rt">Qty</th><th class="rt">Total</th></tr></thead>
+        <tbody>${(s.items||[]).map(i=>`<tr>
+          <td><span class="chip">${i.sku}</span></td><td>${i.nama||'—'}</td>
+          <td class="rt">${rp(i.hj)}</td><td class="rt">${fmt(i.qty)}</td><td class="rt">${rp(i.total)}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>
+      <div class="sb">
+        <div class="row"><span>Subtotal Barang</span><span>${rp(pr.gross)}</span></div>
+        ${pr.fee>0?`<div class="row"><span>Fee Marketplace</span><span class="r">(${rp(pr.fee)})</span></div>`:''}
+        ${pr.ongkir>0?`<div class="row"><span>Biaya Kirim</span><span>${rp(pr.ongkir)}</span></div>`:''}
+        ${pr.retur>0?`<div class="row"><span>Retur</span><span class="r">(${rp(pr.retur)})</span></div>`:''}
+        <div class="row"><span>Neto</span><strong>${rp(pr.neto)}</strong></div>
+        <div class="row"><span>Sudah Dibayar</span><span class="g">${rp(paid)}</span></div>
+        <div class="row"><span>Sisa</span><strong class="${payStatus==='paid'?'g':'r'}">${rp(Math.max(0,pr.neto-paid))}</strong></div>
+      </div>
+      ${(s.payments||[]).length?`<div style="margin-top:14px"><div style="font-size:11px;font-weight:700;color:var(--t2);margin-bottom:6px">RIWAYAT PEMBAYARAN</div>
+      <table><thead><tr><th>Tanggal</th><th>Metode</th><th class="rt">Jumlah</th><th>Catatan</th></tr></thead><tbody>
+      ${s.payments.map(p=>`<tr><td>${fd(p.tgl)}</td><td>${p.met}</td><td class="rt g">${rp(p.amountIDR||p.amount)}</td><td>${p.note||'—'}</td></tr>`).join('')}
+      </tbody></table></div>`:''}
+    </div>
+    <div class="mf">
+      <button class="btn btn-ok" data-paysell="${s.id}" id="bPayFromView"><i class="ti ti-cash"></i> Catat Pembayaran</button>
+      <button class="btn btn-p" id="bCl2">Tutup</button>
+    </div>
   </div></div>`;
   }
   return'';
@@ -1571,6 +1635,9 @@ function bind(){
   document.querySelectorAll('[data-lr]').forEach(el=>el.addEventListener('click',()=>{
     S.modal={type:'lrDetail',data:{lrKey:el.dataset.lr,fp:S.fp,fy:S.fy,fm:S.fm}};render();bm();
   }));
+  document.querySelectorAll('[data-viewsale]').forEach(el=>el.addEventListener('click',()=>{
+    S.modal={type:'viewSale',data:{id:el.dataset.viewsale}};render();bm();
+  }));
   // produk
   document.querySelectorAll('[data-ep]').forEach(el=>el.addEventListener('click',()=>{const p=S.products.find(x=>x.id===el.dataset.ep);S.modal={type:'prod',data:{...p}};render();bm();}));
   document.querySelectorAll('[data-dp]').forEach(el=>el.addEventListener('click',()=>{if(confirm('Hapus produk ini?')){S.products=S.products.filter(x=>x.id!==el.dataset.dp);save();render();}}));
@@ -1793,6 +1860,25 @@ function bm(){
     save();S.modal=null;render();
   });
 
+  // PAYMENT SELL — update sisa setelah bayar secara real-time
+  (()=>{
+    const amtEl=document.getElementById('fAmt');
+    const sisaEl=document.getElementById('sisaAfter');
+    const svBtn=document.getElementById('bSvPaySell');
+    if(amtEl&&sisaEl&&svBtn){
+      const invId=svBtn.dataset.id;
+      const inv=S.sales.find(x=>x.id===invId)||{};
+      const paid=(inv.payments||[]).reduce((a,p)=>a+(p.amountIDR||p.amount),0);
+      const neto=saleNeto(inv);
+      amtEl.addEventListener('input',()=>{
+        const amt=parseFloat(amtEl.value)||0;
+        const after=Math.max(0,neto-paid-amt);
+        sisaEl.textContent=rp(after);
+        sisaEl.style.color=after===0?'var(--ok)':'var(--err)';
+      });
+    }
+  })();
+
   // PAYMENT SELL
   document.getElementById('bSvPaySell')?.addEventListener('click',function(){
     const id=this.dataset.id,tg=document.getElementById('fTg').value;
@@ -1890,7 +1976,48 @@ function bm(){
     const rs=document.getElementById('refSaleRow'),rb=document.getElementById('refBuyRow');
     if(rs)rs.style.display=isJual?'':'none';
     if(rb)rb.style.display=isJual?'none':'';
+    // reset SKU list when jenis changes
+    retPopulateSKU('');
   });
+  // ketika invoice dipilih: populate SKU dari invoice tsb
+  document.getElementById('fRefSale')?.addEventListener('change',e=>{retPopulateSKU(e.target.value,'sale');});
+  document.getElementById('fRefBuy')?.addEventListener('change',e=>{retPopulateSKU(e.target.value,'buy');});
+  document.getElementById('fSkRet')?.addEventListener('change',()=>retCalcNilai());
+  document.getElementById('fQt')?.addEventListener('input',()=>retCalcNilai());
+}
+
+// helper: populate SKU dropdown sesuai invoice yang dipilih
+function retPopulateSKU(refId,refType){
+  const sel=document.getElementById('fSkRet');if(!sel)return;
+  sel.innerHTML='<option value="">— Pilih SKU —</option>';
+  if(!refId){return;}
+  let items=[];
+  if(refType==='sale'){
+    const sale=S.sales.find(x=>x.id===refId);
+    items=(sale?.items||[]);
+  }else{
+    const buy=S.purchases.find(x=>x.id===refId);
+    items=(buy?.items||[]);
+  }
+  items.forEach(i=>{
+    const opt=document.createElement('option');
+    opt.value=i.sku;
+    opt.textContent=i.sku+' — '+(i.nama||'')+(i.qty?' ('+fmt(i.qty)+' pcs)':'');
+    opt.dataset.harga=refType==='sale'?(i.hj||0):(i.hargaNetIDR||i.hargaNetAsli||0);
+    sel.appendChild(opt);
+  });
+  retCalcNilai();
+}
+// helper: auto-fill nilai retur
+function retCalcNilai(){
+  const sel=document.getElementById('fSkRet');
+  const qtyEl=document.getElementById('fQt');
+  const nilaiEl=document.getElementById('fNilai');
+  if(!sel||!qtyEl||!nilaiEl)return;
+  const opt=sel.options[sel.selectedIndex];
+  const harga=parseFloat(opt?.dataset?.harga||0);
+  const qty=parseFloat(qtyEl.value)||1;
+  if(harga>0)nilaiEl.value=Math.round(harga*qty);
 }
 
 function bindPOItems(){
