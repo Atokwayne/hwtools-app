@@ -100,13 +100,14 @@ let S={
   page:'dashboard',modal:null,
   products:[],purchases:[],sales:[],
   suppliers:[],customers:[],expenses:[],returns:[],purchaseOrders:[],
+  stockConversions:[],
   fb:'',fp:'monthly',fy:new Date().getFullYear(),fm:new Date().getMonth(),q:'',
   imp:null,
 };
 
 function load(){
   try{const d=localStorage.getItem(KEY);if(d){const p=JSON.parse(d);
-    ['products','purchases','sales','suppliers','customers','expenses','returns','purchaseOrders'].forEach(k=>{if(p[k])S[k]=p[k];});
+    ['products','purchases','sales','suppliers','customers','expenses','returns','purchaseOrders','stockConversions'].forEach(k=>{if(p[k])S[k]=p[k];});
   }}catch(e){}
   // migrasi dari v2 lama jika ada
   try{const old=localStorage.getItem('hwtools-v2');if(old&&!S.products.length){const p=JSON.parse(old);
@@ -120,7 +121,7 @@ function load(){
   }}catch(e){}
 }
 function save(){
-  try{localStorage.setItem(KEY,JSON.stringify({products:S.products,purchases:S.purchases,sales:S.sales,suppliers:S.suppliers,customers:S.customers,expenses:S.expenses,returns:S.returns,purchaseOrders:S.purchaseOrders}));}catch(e){}
+  try{localStorage.setItem(KEY,JSON.stringify({products:S.products,purchases:S.purchases,sales:S.sales,suppliers:S.suppliers,customers:S.customers,expenses:S.expenses,returns:S.returns,purchaseOrders:S.purchaseOrders,stockConversions:S.stockConversions}));}catch(e){}
 }
 function toast(msg,ok=true){const t=document.createElement('div');t.className='toast';t.textContent=msg;t.style.background=ok?'#1C2333':'#A32D2D';document.body.appendChild(t);setTimeout(()=>t.remove(),2500);}
 
@@ -133,7 +134,12 @@ function stats(sku){
   const tRetIn=S.returns.filter(x=>x.stokMasuk&&x.sku===sku&&(x.jenisRetur||'penjualan')==='penjualan').reduce((a,x)=>a+x.qty,0);
   // retur pembelian yang dikonfirmasi = stok keluar (-)
   const tRetOut=S.returns.filter(x=>x.stokMasuk&&x.sku===sku&&x.jenisRetur==='pembelian').reduce((a,x)=>a+x.qty,0);
-  const stokBagus=Math.max(0,(p.sb||0)+tIn-tOut+tRetIn-tRetOut);
+  // konversi stok: SKU ini bisa jadi sumber (keluar) atau tujuan (masuk)
+  const tConvIn=S.stockConversions.reduce((a,c)=>
+    a+(c.masuk||[]).filter(x=>x.sku===sku).reduce((b,x)=>b+x.qty,0),0);
+  const tConvOut=S.stockConversions.reduce((a,c)=>
+    a+(c.keluar||[]).filter(x=>x.sku===sku).reduce((b,x)=>b+x.qty,0),0);
+  const stokBagus=(p.sb||0)+tIn-tOut+tRetIn-tRetOut+tConvIn-tConvOut;
   let q=p.sb||0,v=(p.m||0)*q;
   S.purchases.forEach(inv=>(inv.items||[]).filter(x=>x.sku===sku).forEach(x=>{q+=x.qty;v+=(x.hnIDR||x.hn||0)*x.qty;}));
   return{stokBagus,stokKaratan:p.sk||0,avg:q>0?v/q:p.m||0};
@@ -152,8 +158,14 @@ function saleProfit(sale){
   const fee=sale.fee||0, ongkir=sale.ongkir||0;
   const retur=returnsForSale(sale.id);
   const neto=gross-fee-retur;
+  // PPN tax-inclusive: sudah termasuk dalam harga jual
+  // ppn = neto * rate / (1 + rate), bukan neto * rate
+  const ppnAktif=sale.ppnOn===true||sale.ppnOn==='yes';
+  const ppnRate=(sale.ppnPct||11)/100;
+  const ppn=ppnAktif?Math.round(neto*ppnRate/(1+ppnRate)):0;
+  const netoSebelumPPN=ppnAktif?neto-ppn:neto;
   const labaKotor=neto-hppTotal-ongkir;
-  return{gross,fee,ongkir,retur,neto,hppTotal,labaKotor,margin:neto>0?labaKotor/neto:0};
+  return{gross,fee,ongkir,retur,neto,ppn,ppnAktif,netoSebelumPPN,hppTotal,labaKotor,margin:neto>0?labaKotor/neto:0};
 }
 function saleNeto(sale){return saleProfit(sale).neto;}
 function metricsPenjualan(period,yr,mo){
@@ -195,7 +207,7 @@ function danaTertahanTotal(){
   return S.sales.filter(x=>x.ch==='Online'&&x.danaStatus==='tertahan').reduce((a,x)=>a+saleNeto(x),0);
 }
 // ═══ LAYOUT ═══
-const PAGES={dashboard:'Dashboard',analisis:'Analisis Bisnis',labarugi:'Laporan Laba Rugi',reminder:'Reminder Jatuh Tempo',produk:'Data Produk',po:'Purchase Order',pembelian:'Pembelian',penjualan:'Penjualan',rekap:'Rekap per Brand',retur:'Retur',piutang:'Piutang Customer',utang:'Hutang Supplier',biaya:'Pencatatan Biaya',supplier:'Database Supplier',customer:'Database Customer'};
+const PAGES={dashboard:'Dashboard',analisis:'Analisis Bisnis',labarugi:'Laporan Laba Rugi',reminder:'Reminder Jatuh Tempo',produk:'Data Produk',po:'Purchase Order',pembelian:'Pembelian',penjualan:'Penjualan',rekap:'Rekap per Brand',retur:'Retur',konversi:'Konversi Stok',piutang:'Piutang Customer',utang:'Hutang Supplier',biaya:'Pencatatan Biaya',supplier:'Database Supplier',customer:'Database Customer'};
 function render(){document.getElementById('app').innerHTML=layout();bind();}
 function renderContent(){const c=document.querySelector('.content');if(c){c.innerHTML=page();bind();}else render();}
 function navI(icon,lbl,pg){return`<div class="ni${S.page===pg?' active':''}" data-nav="${pg}"><i class="ti ti-${icon}"></i>${lbl}</div>`;}
@@ -208,7 +220,7 @@ function layout(){
     supplier:`<button class="btn btn-p" id="bAddSup"><i class="ti ti-plus"></i> Tambah Supplier</button>`,
     customer:`<button class="btn btn-p" id="bAddCust"><i class="ti ti-plus"></i> Tambah Customer</button>`,
     biaya:`<button class="btn btn-p" id="bAddExp"><i class="ti ti-plus"></i> Catat Biaya</button>`,
-    retur:`<button class="btn btn-p" id="bAddRet"><i class="ti ti-plus"></i> Catat Retur</button>`,
+    konversi:`<button class="btn btn-p" id="bAddKonv"><i class="ti ti-plus"></i> Konversi Baru</button>`,
   };
   return`<div class="layout">
   <div class="sidebar">
@@ -223,6 +235,7 @@ function layout(){
       ${navI('package','Data Produk','produk')}
       ${navI('rekap','Rekap per Brand','rekap')}
       ${navI('refresh','Retur','retur')}
+      ${navI('arrows-exchange','Konversi Stok','konversi')}
       <div class="nl">Pembelian</div>
       ${navI('file-text','Purchase Order','po')}
       ${navI('arrow-bar-to-down','Pembelian','pembelian')}
@@ -248,7 +261,7 @@ function layout(){
   </div>${S.modal?modal():''}`;
 }
 function page(){
-  const m={dashboard:pgDash,analisis:pgAn,labarugi:pgLR,reminder:pgReminder,produk:pgProd,po:pgPO,pembelian:pgBuy,penjualan:pgSell,rekap:pgRekap,retur:pgRetur,piutang:pgPiutang,utang:pgUtang,biaya:pgBiaya,supplier:pgSup,customer:pgCust};
+  const m={dashboard:pgDash,analisis:pgAn,labarugi:pgLR,reminder:pgReminder,produk:pgProd,po:pgPO,pembelian:pgBuy,penjualan:pgSell,rekap:pgRekap,retur:pgRetur,konversi:pgKonversi,piutang:pgPiutang,utang:pgUtang,biaya:pgBiaya,supplier:pgSup,customer:pgCust};
   return (m[S.page]||(()=>''))();
 }
 
@@ -474,7 +487,7 @@ function pgProd(){
     <td>${p.foto?`<div style="width:38px;height:38px;border-radius:6px;background:#F5F6FA url('${p.foto}') center/cover no-repeat;border:1px solid var(--bd)"></div>`:`<div style="width:38px;height:38px;border-radius:6px;background:#F5F6FA;border:1px solid var(--bd);display:flex;align-items:center;justify-content:center"><i class="ti ti-photo" style="color:#9CA3AF;font-size:16px"></i></div>`}</td>
     <td><span class="chip">${p.sku}</span></td><td><span class="bdg bb">${p.brand}</span></td><td>${p.nama}</td>
     <td class="rt">${rp(p.m)}</td><td class="rt o">${rp(s.avg)}</td>
-    <td class="rt g">${fmt(s.stokBagus)}</td><td class="rt ${s.stokKaratan>0?'r':''}">${fmt(s.stokKaratan)}</td>
+    <td class="rt ${s.stokBagus<0?'r':'g'}">${s.stokBagus<0?'⚠ ':''}<strong>${fmt(s.stokBagus)}</strong></td><td class="rt ${s.stokKaratan<0?'r':s.stokKaratan>0?'r':''}">${fmt(s.stokKaratan)}</td>
     <td class="rt">${rp(s.stokBagus*s.avg)}</td>
     <td style="white-space:nowrap"><button class="btn btn-ic btn-sm" data-ep="${p.id}"><i class="ti ti-edit"></i></button> <button class="btn btn-ic btn-sm btn-d" data-dp="${p.id}"><i class="ti ti-trash"></i></button></td>
   </tr>`;}).join('')}
@@ -605,6 +618,49 @@ function pgRekap(){
         <td class="rt o">${rp(s.avg)}</td><td class="rt">${rp(s.stokBagus*s.avg)}</td></tr>`;}).join('')}
     </tbody></table></div></div>`;
   }).join('')}`;
+}
+
+// ═══ KONVERSI STOK ═══
+function pgKonversi(){
+  const fl=[...S.stockConversions].reverse().filter(c=>{
+    if(!S.q)return true;
+    const q=S.q.toLowerCase();
+    return c.catatan?.toLowerCase().includes(q)||
+      (c.keluar||[]).some(x=>x.sku.toLowerCase().includes(q))||
+      (c.masuk||[]).some(x=>x.sku.toLowerCase().includes(q));
+  });
+  // ringkasan: total konversi & SKU yang paling sering dikonversi
+  const skuCount={};
+  S.stockConversions.forEach(c=>{
+    [...(c.keluar||[]),...(c.masuk||[])].forEach(x=>{skuCount[x.sku]=(skuCount[x.sku]||0)+x.qty;});
+  });
+  const topSKU=Object.entries(skuCount).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  return`
+  <div class="fb"><input id="iQ" placeholder="Cari SKU / catatan..." value="${S.q}"></div>
+  <div class="mg">
+    <div class="met"><div class="ml">Total Konversi</div><div class="mv">${S.stockConversions.length}</div><div class="ms">transaksi switch</div></div>
+    <div class="met"><div class="ml">SKU Terlibat</div><div class="mv">${Object.keys(skuCount).length}</div><div class="ms">SKU pernah dikonversi</div></div>
+  </div>
+  ${topSKU.length?`<div class="card"><div class="card-t">SKU Paling Sering Dikonversi</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+    ${topSKU.map(([sku,qty])=>{const p=S.products.find(x=>x.sku===sku);return`<div style="padding:8px 12px;background:#F5F6FA;border-radius:8px;border:1px solid var(--bd)"><div class="chip" style="margin-bottom:4px">${sku}</div><div style="font-size:11px;color:var(--t2)">${p?p.nama:''}</div><div style="font-size:12px;font-weight:600;margin-top:2px">${fmt(qty)} pcs total</div></div>`;}).join('')}
+    </div>
+  </div>`:''}
+  <div class="tw"><table><thead><tr><th>Tanggal</th><th>No. Ref</th><th>SKU Keluar (Sumber)</th><th>SKU Masuk (Tujuan)</th><th>Catatan</th><th></th></tr></thead><tbody>
+  ${!fl.length?`<tr><td colspan="6"><div class="empty"><i class="ti ti-arrows-exchange" style="font-size:32px"></i><p>Belum ada konversi stok</p></div></td></tr>`:
+  fl.map(c=>`<tr>
+    <td class="nw">${fd(c.tgl)}</td>
+    <td><span class="chip">${c.noRef||'—'}</span></td>
+    <td>
+      ${(c.keluar||[]).map(x=>{const p=S.products.find(pp=>pp.sku===x.sku);return`<div style="margin:2px 0"><span class="chip">${x.sku}</span> <span class="tm" style="font-size:11px">${p?p.nama:''}</span> <span class="bdg br">${fmt(x.qty)} pcs</span></div>`;}).join('')}
+    </td>
+    <td>
+      ${(c.masuk||[]).map(x=>{const p=S.products.find(pp=>pp.sku===x.sku);return`<div style="margin:2px 0"><span class="chip">${x.sku}</span> <span class="tm" style="font-size:11px">${p?p.nama:''}</span> <span class="bdg bg2">${fmt(x.qty)} pcs</span></div>`;}).join('')}
+    </td>
+    <td class="tm">${c.catatan||'—'}</td>
+    <td><button class="btn btn-ic btn-sm btn-d" data-dkonv="${c.id}"><i class="ti ti-trash"></i></button></td>
+  </tr>`).join('')}
+  </tbody></table></div>`;
 }
 
 // ═══ RETUR ═══
@@ -776,7 +832,7 @@ function modal(){
     <div class="mh"><h3>${d.id?'Edit Produk':'Tambah Produk'}</h3><button class="btn btn-ic" id="bCl"><i class="ti ti-x"></i></button></div>
     <div class="mb">
       <div class="fr c2"><div><label>Brand</label><select id="fBr">${BRANDS.map(b=>`<option value="${b}" ${d.brand===b?'selected':''}>${b}</option>`).join('')}</select></div>
-      <div><label>SKU</label><input id="fSk" value="${d.sku||''}" placeholder="Contoh: TKR-001" ${d.id?'readonly style="background:#f5f6fa"':''}></div></div>
+      <div><label>SKU ${d.id?'<span class="tm">(perubahan SKU akan update semua data terkait)</span>':''}</label><input id="fSk" value="${d.sku||''}" placeholder="Contoh: TKR-001"></div></div>
       <div class="fr"><label>Nama Barang</label><input id="fNm" value="${d.nama||''}" placeholder="Nama lengkap produk"></div>
       <div class="fr c3">
         <div><label>Modal Awal (Rp)</label><input id="fMd" type="number" value="${d.m||0}" min="0"></div>
@@ -1262,6 +1318,64 @@ function modal(){
     </div>
   </div></div>`;
   }
+
+  // KONVERSI STOK
+  if(type==='konversi'){
+    const d=S.modal.data||{};
+    // build stok info per baris
+    const konvLine=(prefix,items,label,badgeClass)=>{
+      if(!items||!items.length)return'';
+      return items.map((it,i)=>{
+        const p=S.products.find(x=>x.sku===it.sku);
+        const s=p?stats(it.sku):{stokBagus:0};
+        return`<div class="${prefix}Line" data-idx="${i}" style="display:grid;grid-template-columns:1fr 120px 36px;gap:6px;align-items:center;padding:7px;background:#FAFBFC;border:1px solid var(--bd);border-radius:7px;margin-bottom:6px">
+          <select class="${prefix}Sku" data-idx="${i}">
+            <option value="">— Pilih SKU —</option>
+            ${S.products.map(pp=>`<option value="${pp.sku}" ${it.sku===pp.sku?'selected':''}>${pp.sku} — ${pp.nama}</option>`).join('')}
+          </select>
+          <div style="font-size:11px;color:var(--t2)">
+            ${p?`<span class="chip" style="font-size:10px">${it.sku}</span><br><span style="color:${s.stokBagus<0?'var(--err)':s.stokBagus<3?'var(--warn)':'var(--ok)'}">Stok: ${fmt(s.stokBagus)}</span>`:''}
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <input class="${prefix}Qty" type="number" value="${it.qty||1}" min="1" style="text-align:center;font-size:12px;padding:4px">
+            <button class="btn btn-ic btn-sm btn-d ${prefix}Rem"><i class="ti ti-minus"></i></button>
+          </div>
+        </div>`;
+      }).join('');
+    };
+    const keluarItems=d.keluar||[{sku:'',qty:1}];
+    const masukItems=d.masuk||[{sku:'',qty:1}];
+    return`<div class="ov" id="mOv"><div class="modal modal-lg">
+    <div class="mh"><h3>Konversi Stok (Switch Bracket/Komponen)</h3><button class="btn btn-ic" id="bCl"><i class="ti ti-x"></i></button></div>
+    <div class="mb">
+      <div class="fr c3">
+        <div><label>Tanggal</label><input id="fTg" type="date" value="${d.tgl||today()}"></div>
+        <div><label>No. Referensi (Opsional)</label><input id="fNoRef" value="${d.noRef||''}" placeholder="KONV-001"></div>
+        <div><label>Catatan (Opsional)</label><input id="fCatatan" value="${d.catatan||''}" placeholder="Switch bracket karet → fixed"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:4px">
+        <div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <label style="margin:0;color:var(--err)">🔻 SKU KELUAR (Stok Berkurang)</label>
+            <button class="btn btn-sm" id="bAddKeluar"><i class="ti ti-plus"></i> Tambah</button>
+          </div>
+          <div id="keluarList">${konvLine('keluar',keluarItems,'Keluar','br')}</div>
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <label style="margin:0;color:var(--ok)">🔺 SKU MASUK (Stok Bertambah)</label>
+            <button class="btn btn-sm" id="bAddMasuk"><i class="ti ti-plus"></i> Tambah</button>
+          </div>
+          <div id="masukList">${konvLine('masuk',masukItems,'Masuk','bg2')}</div>
+        </div>
+      </div>
+      <div class="ib" style="margin-top:10px;font-size:11px">
+        <strong>Cara pakai:</strong> SKU Keluar = komponen yang kamu "ambil" stoknya. SKU Masuk = SKU baru yang terbentuk setelah switch. Qty boleh berbeda (misal: 5 unit Swivel jadi 5 unit Fixed, bracket Nylon 5 unit jadi Swivel).
+      </div>
+    </div>
+    <div class="mf"><button class="btn" id="bCl2">Batal</button><button class="btn btn-p" id="bSvKonv">Simpan Konversi</button></div>
+  </div></div>`;
+  }
   return'';
 }
 // ═══ SKU LINE HELPERS ═══
@@ -1303,14 +1417,18 @@ function skuLineSell(it,idx){
 function calcSellSummary(items,fee,ongkir,ppnOn,ppnPct){
   const gross=items.reduce((a,i)=>a+(i.total||0),0);
   const ppnAktif=ppnOn==='yes'||ppnOn===true;
-  const ppn=ppnAktif?gross*((ppnPct||11)/100):0;
+  const ppnRate=(ppnPct||11)/100;
   const neto=gross-(fee||0);
-  return`<div class="row"><span>Subtotal Barang</span><span>${rp(gross)}</span></div>
-    ${ppnAktif?`<div class="row"><span>PPN ${ppnPct||11}%</span><span>${rp(ppn)}</span></div>`:''}
+  // tax-inclusive: PPN sudah termasuk dalam harga jual, diekstrak
+  const ppn=ppnAktif?Math.round(neto*ppnRate/(1+ppnRate)):0;
+  const netoSebelumPPN=ppnAktif?neto-ppn:neto;
+  return`<div class="row"><span>Subtotal Barang (inc. PPN)</span><span>${rp(gross)}</span></div>
     <div class="row"><span>Fee Marketplace</span><span class="r">${rp(fee||0)}</span></div>
-    <div class="row"><span>Biaya Kirim / Ongkir</span><span>${rp(ongkir||0)}</span></div>
+    ${ongkir>0?`<div class="row"><span>Biaya Kirim / Ongkir</span><span>${rp(ongkir||0)}</span></div>`:''}
     <div class="row"><span>Total Neto Invoice</span><strong>${rp(neto)}</strong></div>
-    ${ppnAktif?`<div class="row"><span>Total + PPN (tagihan ke customer)</span><strong>${rp(neto+ppn)}</strong></div>`:''}`;
+    ${ppnAktif?`<div class="divider" style="margin:4px 0"></div>
+    <div class="row tm"><span>├ Neto sebelum PPN</span><span>${rp(netoSebelumPPN)}</span></div>
+    <div class="row tm"><span>├ PPN ${ppnPct||11}% (sudah termasuk)</span><span>${rp(ppn)}</span></div>`:''}`;
 }
 
 // collectors
@@ -1417,9 +1535,8 @@ function exportInvoicePdf(sale){
   lbl('Subtotal Barang:',rp(pr.gross),y);y+=6;
   if(pr.fee>0){lbl('Fee Marketplace:',rp(pr.fee),y);y+=6;}
   if(pr.ongkir>0){lbl('Biaya Kirim:',rp(pr.ongkir),y);y+=6;}
-  const ppn=sale.ppnOn?pr.gross*((sale.ppnPct||11)/100):0;
-  if(sale.ppnOn){lbl(`PPN ${sale.ppnPct||11}%:`,rp(ppn),y);y+=6;}
-  doc.setFont(undefined,'bold');lbl('TOTAL:',rp(pr.neto+ppn),y);doc.setFont(undefined,'normal');
+  if(pr.ppnAktif){lbl(`PPN ${sale.ppnPct||11}% (sudah termasuk):`,rp(pr.ppn),y);y+=6;lbl('Neto sebelum PPN:',rp(pr.netoSebelumPPN),y);y+=6;}
+  doc.setFont(undefined,'bold');lbl('TOTAL NETO:',rp(pr.neto),y);doc.setFont(undefined,'normal');
   doc.save(`Invoice_${sale.inv||sale.id}.pdf`);
 }
 function exportInvoiceXls(sale){
@@ -1631,6 +1748,11 @@ function bind(){
   document.getElementById('bAddCust')?.addEventListener('click',()=>{S.modal={type:'cust',data:{}};render();bm();});
   document.getElementById('bAddExp')?.addEventListener('click',()=>{S.modal={type:'exp',data:{}};render();bm();});
   document.getElementById('bAddRet')?.addEventListener('click',()=>{S.modal={type:'ret',data:{}};render();bm();});
+  document.getElementById('bAddKonv')?.addEventListener('click',()=>{S.modal={type:'konversi',data:{}};render();bm();});
+  document.querySelectorAll('[data-dkonv]').forEach(el=>el.addEventListener('click',()=>{
+    if(confirm('Hapus konversi ini? Stok akan dikembalikan ke kondisi sebelum konversi.'))
+    {S.stockConversions=S.stockConversions.filter(x=>x.id!==el.dataset.dkonv);save();render();}
+  }));
   document.getElementById('bExpLR')?.addEventListener('click',exportLRxls);
   document.querySelectorAll('[data-lr]').forEach(el=>el.addEventListener('click',()=>{
     S.modal={type:'lrDetail',data:{lrKey:el.dataset.lr,fp:S.fp,fy:S.fy,fm:S.fm}};render();bm();
@@ -1688,7 +1810,7 @@ function bind(){
   document.getElementById('mOv')?.addEventListener('click',e=>{if(e.target.id==='mOv'){S.modal=null;render();}});
   // export/import
   document.getElementById('bExp')?.addEventListener('click',()=>{
-    const keys=['products','purchases','sales','suppliers','customers','expenses','returns','purchaseOrders'];
+    const keys=['products','purchases','sales','suppliers','customers','expenses','returns','purchaseOrders','stockConversions'];
     const d=JSON.stringify(Object.fromEntries(keys.map(k=>[k,S[k]])),null,2);
     const a=document.createElement('a');a.href='data:application/json,'+encodeURIComponent(d);
     a.download='hwtools-v21-'+today()+'.json';a.click();toast('Data diekspor');
@@ -1696,7 +1818,7 @@ function bind(){
   document.getElementById('bImp')?.addEventListener('change',e=>{
     const f=e.target.files[0];if(!f)return;
     const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);
-      ['products','purchases','sales','suppliers','customers','expenses','returns','purchaseOrders'].forEach(k=>{
+      ['products','purchases','sales','suppliers','customers','expenses','returns','purchaseOrders','stockConversions'].forEach(k=>{
         if(d[k])S[k]=[...S[k],...d[k].filter(x=>!S[k].find(y=>y.id===x.id))];});
       save();render();toast('Import berhasil!');}catch(e){alert('File tidak valid');}};r.readAsText(f);
   });
@@ -1782,13 +1904,33 @@ function bm(){
   });
   document.getElementById('bSvP')?.addEventListener('click',function(){
     const id=this.dataset.id,br=document.getElementById('fBr').value;
-    const sku=document.getElementById('fSk').value.trim().toUpperCase(),nama=document.getElementById('fNm').value.trim();
+    const newSku=document.getElementById('fSk').value.trim().toUpperCase(),nama=document.getElementById('fNm').value.trim();
     const m=parseFloat(document.getElementById('fMd').value)||0,sb=parseFloat(document.getElementById('fSb').value)||0,sk=parseFloat(document.getElementById('fSk2').value)||0;
     const foto=document.getElementById('fFotoData')?.value||'';
-    if(!sku||!nama){alert('SKU dan Nama wajib diisi');return;}
-    if(id){S.products=S.products.map(p=>p.id===id?{...p,brand:br,nama,m,sb,sk,foto}:p);}
-    else{if(S.products.find(p=>p.sku===sku)){alert('SKU sudah ada!');return;}S.products.push({id:uid(),brand:br,sku,nama,m,sb,sk,foto});}
-    save();S.modal=null;render();toast(id?'Produk diperbarui':'Produk ditambahkan');
+    if(!newSku||!nama){alert('SKU dan Nama wajib diisi');return;}
+    if(id){
+      const oldProd=S.products.find(p=>p.id===id);
+      const oldSku=oldProd?.sku||'';
+      // cek duplikat SKU baru (bukan diri sendiri)
+      if(newSku!==oldSku&&S.products.find(p=>p.sku===newSku)){alert('SKU '+newSku+' sudah dipakai produk lain!');return;}
+      S.products=S.products.map(p=>p.id===id?{...p,brand:br,sku:newSku,nama,m,sb,sk,foto}:p);
+      // CASCADE: update SKU lama ke baru di semua data
+      if(newSku!==oldSku){
+        const cascSku=arr=>arr.map(x=>({...x,items:(x.items||[]).map(i=>i.sku===oldSku?{...i,sku:newSku}:i)}));
+        S.purchases=cascSku(S.purchases);
+        S.sales=cascSku(S.sales);
+        const cascDirect=arr=>arr.map(x=>x.sku===oldSku?{...x,sku:newSku}:x);
+        S.returns=cascDirect(S.returns);
+        const cascPO=arr=>arr.map(x=>({...x,items:(x.items||[]).map(i=>i.sku===oldSku?{...i,sku:newSku}:i)}));
+        S.purchaseOrders=cascPO(S.purchaseOrders);
+        toast('SKU diperbarui: '+oldSku+' → '+newSku+' (semua data terkait telah diupdate)');
+      }else{toast('Produk diperbarui');}
+    }else{
+      if(S.products.find(p=>p.sku===newSku)){alert('SKU sudah ada!');return;}
+      S.products.push({id:uid(),brand:br,sku:newSku,nama,m,sb,sk,foto});
+      toast('Produk ditambahkan');
+    }
+    save();S.modal=null;render();
   });
 
   // PO
@@ -1949,6 +2091,68 @@ function bm(){
     if(id){S.expenses=S.expenses.map(x=>x.id===id?{...x,...rec}:x);toast('Biaya diperbarui');}
     else{S.expenses.push({id:uid(),...rec});toast('Biaya dicatat');}
     save();S.modal=null;render();
+  });
+
+  // KONVERSI STOK
+  const collectKonvLines=(prefix)=>{
+    return [...document.querySelectorAll(`.${prefix}Line`)].map(line=>{
+      const sku=line.querySelector(`.${prefix}Sku`)?.value||'';
+      const qty=parseFloat(line.querySelector(`.${prefix}Qty`)?.value)||1;
+      const p=S.products.find(x=>x.sku===sku);
+      return{sku,nama:p?.nama||'',brand:p?.brand||'',qty};
+    }).filter(x=>x.sku);
+  };
+  const addKonvLine=(listId,prefix)=>{
+    const list=document.getElementById(listId);if(!list)return;
+    const idx=list.querySelectorAll(`.${prefix}Line`).length;
+    const div=document.createElement('div');
+    div.innerHTML=`<div class="${prefix}Line" data-idx="${idx}" style="display:grid;grid-template-columns:1fr 120px 36px;gap:6px;align-items:center;padding:7px;background:#FAFBFC;border:1px solid var(--bd);border-radius:7px;margin-bottom:6px">
+      <select class="${prefix}Sku" data-idx="${idx}"><option value="">— Pilih SKU —</option>${S.products.map(p=>`<option value="${p.sku}">${p.sku} — ${p.nama}</option>`).join('')}</select>
+      <div class="${prefix}Info" style="font-size:11px;color:var(--t2)">—</div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <input class="${prefix}Qty" type="number" value="1" min="1" style="text-align:center;font-size:12px;padding:4px">
+        <button class="btn btn-ic btn-sm btn-d ${prefix}Rem"><i class="ti ti-minus"></i></button>
+      </div>
+    </div>`;
+    list.appendChild(div.firstElementChild);
+    bindKonvLine(list.lastElementChild,prefix);
+  };
+  const bindKonvLine=(line,prefix)=>{
+    const skuSel=line.querySelector(`.${prefix}Sku`);
+    const infoDiv=line.querySelector(`.${prefix}Info`);
+    if(skuSel&&infoDiv){
+      skuSel.addEventListener('change',()=>{
+        const sku=skuSel.value;const p=S.products.find(x=>x.sku===sku);
+        if(p){const s=stats(sku);const clr=s.stokBagus<0?'var(--err)':s.stokBagus<3?'var(--warn)':'var(--ok)';
+          infoDiv.innerHTML=`<span class="chip" style="font-size:10px">${sku}</span><br><span style="color:${clr}">Stok: ${fmt(s.stokBagus)}</span>`;}
+        else infoDiv.textContent='—';
+      });
+    }
+    line.querySelector(`.${prefix}Rem`)?.addEventListener('click',()=>line.remove());
+  };
+  document.getElementById('bAddKeluar')?.addEventListener('click',()=>addKonvLine('keluarList','keluar'));
+  document.getElementById('bAddMasuk')?.addEventListener('click',()=>addKonvLine('masukList','masuk'));
+  document.querySelectorAll('.keluarLine').forEach(l=>bindKonvLine(l,'keluar'));
+  document.querySelectorAll('.masukLine').forEach(l=>bindKonvLine(l,'masuk'));
+  document.getElementById('bSvKonv')?.addEventListener('click',()=>{
+    const tgl=document.getElementById('fTg').value;
+    const noRef=document.getElementById('fNoRef').value.trim();
+    const catatan=document.getElementById('fCatatan').value.trim();
+    const keluar=collectKonvLines('keluar');
+    const masuk=collectKonvLines('masuk');
+    if(!tgl){alert('Tanggal wajib diisi');return;}
+    if(!keluar.length&&!masuk.length){alert('Minimal isi 1 SKU keluar dan 1 SKU masuk');return;}
+    if(!keluar.length){alert('Tambahkan minimal 1 SKU yang stoknya berkurang (SKU Keluar)');return;}
+    if(!masuk.length){alert('Tambahkan minimal 1 SKU yang stoknya bertambah (SKU Masuk)');return;}
+    // cek stok cukup
+    const kurang=keluar.filter(x=>{const s=stats(x.sku);return s.stokBagus-x.qty<0;});
+    if(kurang.length){
+      const warn=kurang.map(x=>{const s=stats(x.sku);return`${x.sku} (stok ${fmt(s.stokBagus)}, konversi ${fmt(x.qty)})`;}).join(', ');
+      if(!confirm('Stok akan menjadi minus untuk: '+warn+'\n\nLanjutkan tetap?'))return;
+    }
+    S.stockConversions.push({id:uid(),tgl,noRef,catatan,keluar,masuk});
+    save();S.modal=null;render();
+    toast('Konversi stok berhasil dicatat — '+keluar.length+' SKU keluar, '+masuk.length+' SKU masuk');
   });
 
   // RETUR
