@@ -100,9 +100,9 @@ let S={
   page:'dashboard',modal:null,
   products:[],purchases:[],sales:[],
   suppliers:[],customers:[],expenses:[],returns:[],purchaseOrders:[],
+  stockConversions:[],
   locations:[],deliveryOrders:[],
   filterLoc:'',
-  stockConversions:[],
   fb:'',fp:'monthly',fy:new Date().getFullYear(),fm:new Date().getMonth(),q:'',
   sortBy:'brand',sortDir:'asc',
   txSort:'tgl',txDir:'desc',txMonth:-1,txYear:new Date().getFullYear(),
@@ -165,56 +165,56 @@ function txFilter(arr, getDateVal, getSortVal){
 function toast(msg,ok=true){const t=document.createElement('div');t.className='toast';t.textContent=msg;t.style.background=ok?'#1C2333':'#A32D2D';document.body.appendChild(t);setTimeout(()=>t.remove(),2500);}
 
 // ═══ COMPUTED ═══
-// stats(sku) → total semua lokasi (backward compatible)
-// statsLoc(sku, locId) → stok di satu lokasi spesifik
-function statsLoc(sku, locId){
-  const p=S.products.find(x=>x.sku===sku);if(!p)return{stokBagus:0,stokKaratan:0};
-  // stok awal per lokasi (dari p.stokAwal array)
-  const awal=(p.stokAwal||[]).find(s=>s.locId===locId)||{sbAwal:0,skAwal:0};
-  const sbAwal=awal.sbAwal||0;
-  const skAwal=awal.skAwal||0;
-  // pembelian masuk ke lokasi ini
-  const tIn=S.purchases.filter(x=>x.locId===locId).reduce((a,inv)=>a+(inv.items||[]).filter(x=>x.sku===sku).reduce((b,x)=>b+x.qty,0),0);
-  // penjualan keluar dari lokasi ini
-  const tOut=S.sales.filter(x=>x.locId===locId).reduce((a,inv)=>a+(inv.items||[]).filter(x=>x.sku===sku).reduce((b,x)=>b+x.qty,0),0);
-  // retur ke lokasi ini
-  const tRetIn=S.returns.filter(x=>x.stokMasuk&&x.sku===sku&&x.locId===locId&&(x.jenisRetur||'penjualan')==='penjualan').reduce((a,x)=>a+x.qty,0);
-  const tRetOut=S.returns.filter(x=>x.stokMasuk&&x.sku===sku&&x.locId===locId&&x.jenisRetur==='pembelian').reduce((a,x)=>a+x.qty,0);
-  // konversi di lokasi ini
-  const tConvIn=S.stockConversions.filter(c=>c.locId===locId).reduce((a,c)=>a+(c.masuk||[]).filter(x=>x.sku===sku).reduce((b,x)=>b+x.qty,0),0);
-  const tConvOut=S.stockConversions.filter(c=>c.locId===locId).reduce((a,c)=>a+(c.keluar||[]).filter(x=>x.sku===sku).reduce((b,x)=>b+x.qty,0),0);
-  // DO confirmed: keluar dari lokasi ini (fromLocId) atau masuk ke lokasi ini (toLocId)
-  const tDOout=S.deliveryOrders.filter(d=>d.status==='confirmed'&&d.fromLocId===locId).reduce((a,d)=>a+(d.items||[]).filter(x=>x.sku===sku).reduce((b,x)=>b+x.qty,0),0);
-  const tDOin=S.deliveryOrders.filter(d=>d.status==='confirmed'&&d.toLocId===locId).reduce((a,d)=>a+(d.items||[]).filter(x=>x.sku===sku).reduce((b,x)=>b+x.qty,0),0);
-  const stokBagus=sbAwal+tIn-tOut+tRetIn-tRetOut+tConvIn-tConvOut+tDOin-tDOout;
-  return{stokBagus,stokKaratan:skAwal};
-}
-function stats(sku){
+function stats(sku, locId){
+  // locId=undefined/null = total semua lokasi
   const p=S.products.find(x=>x.sku===sku);if(!p)return{stokBagus:0,stokKaratan:0,avg:0};
-  if(S.locations.length>0&&(p.stokAwal||[]).length>0){
-    // ada data per lokasi → jumlahkan semua lokasi
-    const totBagus=S.locations.reduce((a,loc)=>a+statsLoc(sku,loc.id).stokBagus,0);
-    const totKaratan=S.locations.reduce((a,loc)=>a+statsLoc(sku,loc.id).stokKaratan,0);
-    let q=0,v=0;
-    S.purchases.forEach(inv=>(inv.items||[]).filter(x=>x.sku===sku).forEach(x=>{q+=x.qty;v+=(x.hnIDR||x.hn||0)*x.qty;}));
-    const initQ=(p.stokAwal||[]).reduce((a,s)=>a+(s.sbAwal||0),0);
-    const initV=initQ*(p.m||0);
-    const avgTotal=(initQ+q)>0?(initV+v)/(initQ+q):(p.m||0);
-    return{stokBagus:totBagus,stokKaratan:totKaratan,avg:avgTotal};
+  const byLoc=locId!=null;
+  // stok awal per lokasi atau total
+  let sbAwal,skAwal;
+  if(byLoc){
+    const la=(p.stokAwal||[]).find(x=>x.locId===locId);
+    sbAwal=la?la.sbAwal:0; skAwal=la?la.skAwal:0;
+  }else{
+    // total: stokAwal array + legacy p.sb
+    sbAwal=(p.stokAwal&&p.stokAwal.length)
+      ?(p.stokAwal||[]).reduce((a,x)=>a+x.sbAwal,0)
+      :(p.sb||0);
+    skAwal=(p.stokAwal&&p.stokAwal.length)
+      ?(p.stokAwal||[]).reduce((a,x)=>a+x.skAwal,0)
+      :(p.sk||0);
   }
-  // fallback: tidak ada data per lokasi, pakai cara lama
-  const tIn=S.purchases.reduce((a,inv)=>a+(inv.items||[]).filter(x=>x.sku===sku).reduce((b,x)=>b+x.qty,0),0);
-  const tOut=S.sales.reduce((a,inv)=>a+(inv.items||[]).filter(x=>x.sku===sku).reduce((b,x)=>b+x.qty,0),0);
-  const tRetIn=S.returns.filter(x=>x.stokMasuk&&x.sku===sku&&(x.jenisRetur||'penjualan')==='penjualan').reduce((a,x)=>a+x.qty,0);
-  const tRetOut=S.returns.filter(x=>x.stokMasuk&&x.sku===sku&&x.jenisRetur==='pembelian').reduce((a,x)=>a+x.qty,0);
-  const tConvIn=S.stockConversions.reduce((a,c)=>a+(c.masuk||[]).filter(x=>x.sku===sku).reduce((b,x)=>b+x.qty,0),0);
-  const tConvOut=S.stockConversions.reduce((a,c)=>a+(c.keluar||[]).filter(x=>x.sku===sku).reduce((b,x)=>b+x.qty,0),0);
-  const stokBagus=(p.sb||0)+tIn-tOut+tRetIn-tRetOut+tConvIn-tConvOut;
-  let q=p.sb||0,v=(p.m||0)*q;
+  const locF=arr=>byLoc?arr.filter(x=>x.locId===locId):arr;
+  const tIn=locF(S.purchases).reduce((a,inv)=>a+(inv.items||[]).filter(x=>x.sku===sku).reduce((b,x)=>b+x.qty,0),0);
+  const tOut=locF(S.sales).reduce((a,inv)=>a+(inv.items||[]).filter(x=>x.sku===sku).reduce((b,x)=>b+x.qty,0),0);
+  const retF=arr=>byLoc?arr.filter(x=>x.locId===locId):arr;
+  const tRetIn=retF(S.returns).filter(x=>x.stokMasuk&&x.sku===sku&&(x.jenisRetur||'penjualan')==='penjualan').reduce((a,x)=>a+x.qty,0);
+  const tRetOut=retF(S.returns).filter(x=>x.stokMasuk&&x.sku===sku&&x.jenisRetur==='pembelian').reduce((a,x)=>a+x.qty,0);
+  const convF=arr=>byLoc?arr.filter(x=>x.locId===locId):arr;
+  const tConvIn=convF(S.stockConversions).reduce((a,c)=>a+(c.masuk||[]).filter(x=>x.sku===sku).reduce((b,x)=>b+x.qty,0),0);
+  const tConvOut=convF(S.stockConversions).reduce((a,c)=>a+(c.keluar||[]).filter(x=>x.sku===sku).reduce((b,x)=>b+x.qty,0),0);
+  // DO: confirmed DO menyebabkan stok bergerak antar lokasi
+  let tDOIn=0,tDOOut=0;
+  S.deliveryOrders.filter(x=>x.status==='confirmed').forEach(d=>{
+    const items=(d.items||[]).filter(x=>x.sku===sku);
+    if(!byLoc){return;} // total tidak terpengaruh DO (stok hanya pindah)
+    if(d.fromLocId===locId)tDOOut+=items.reduce((a,x)=>a+x.qty,0);
+    if(d.toLocId===locId)tDOIn+=items.reduce((a,x)=>a+x.qty,0);
+  });
+  const stokBagus=sbAwal+tIn-tOut+tRetIn-tRetOut+tConvIn-tConvOut+tDOIn-tDOOut;
+  // avg modal: pakai semua pembelian (tidak per lokasi, karena HPP global)
+  let q=(p.stokAwal&&p.stokAwal.length)?p.stokAwal.reduce((a,x)=>a+x.sbAwal,0):(p.sb||0);
+  let v=(p.m||0)*q;
   S.purchases.forEach(inv=>(inv.items||[]).filter(x=>x.sku===sku).forEach(x=>{q+=x.qty;v+=(x.hnIDR||x.hn||0)*x.qty;}));
-  return{stokBagus,stokKaratan:p.sk||0,avg:q>0?v/q:p.m||0};
+  return{stokBagus,stokKaratan:byLoc?skAwal:(p.stokAwal&&p.stokAwal.length?p.stokAwal.reduce((a,x)=>a+x.skAwal,0):p.sk||0),avg:q>0?v/q:p.m||0};
 }
-function nilaiTotal(){return S.products.reduce((a,p)=>{const s=stats(p.sku);return a+s.stokBagus*s.avg;},0);}
+// helper: nama lokasi
+function locNama(id){const l=S.locations.find(x=>x.id===id);return l?l.nama:'?';}
+// helper: filter bar lokasi
+function locFilterBar(){
+  if(!S.locations.length)return'';
+  return`<select id="sFilterLoc" style="min-width:160px"><option value="">Semua Lokasi</option>${S.locations.map(l=>`<option value="${l.id}" ${S.filterLoc===l.id?'selected':''}>${l.nama}</option>`).join('')}</select>`;
+}
+function nilaiTotal(locId){return S.products.reduce((a,p)=>{const s=stats(p.sku,locId||undefined);return a+s.stokBagus*s.avg;},0);}
 // laba per invoice penjualan
 function returnsForSale(saleId){
   return S.returns.filter(x=>(x.jenisRetur||'penjualan')==='penjualan'&&x.refSaleId===saleId).reduce((a,x)=>a+(x.nilaiRetur||0),0);
@@ -279,7 +279,7 @@ function danaTertahanTotal(){
   return S.sales.filter(x=>x.ch==='Online'&&x.danaStatus==='tertahan').reduce((a,x)=>a+saleNeto(x),0);
 }
 // ═══ LAYOUT ═══
-const PAGES={dashboard:'Dashboard',analisis:'Analisis Bisnis',labarugi:'Laporan Laba Rugi',reminder:'Reminder Jatuh Tempo',produk:'Data Produk',po:'Purchase Order',pembelian:'Pembelian',penjualan:'Penjualan',rekap:'Rekap per Brand',retur:'Retur',konversi:'Konversi Stok',do:'Delivery Order',lokasi:'Manajemen Lokasi',piutang:'Piutang Customer',utang:'Hutang Supplier',biaya:'Pencatatan Biaya',supplier:'Database Supplier',customer:'Database Customer'};
+const PAGES={dashboard:'Dashboard',analisis:'Analisis Bisnis',labarugi:'Laporan Laba Rugi',reminder:'Reminder Jatuh Tempo',produk:'Data Produk',po:'Purchase Order',pembelian:'Pembelian',penjualan:'Penjualan',rekap:'Rekap per Brand',retur:'Retur',konversi:'Konversi Stok',do:'Delivery Order (DO)',piutang:'Piutang Customer',utang:'Hutang Supplier',biaya:'Pencatatan Biaya',supplier:'Database Supplier',customer:'Database Customer',settings:'Pengaturan Lokasi'};
 function render(){document.getElementById('app').innerHTML=layout();bind();}
 function renderContent(){const c=document.querySelector('.content');if(c){c.innerHTML=page();bind();}else render();}
 function navI(icon,lbl,pg){return`<div class="ni${S.page===pg?' active':''}" data-nav="${pg}"><i class="ti ti-${icon}"></i>${lbl}</div>`;}
@@ -294,7 +294,7 @@ function layout(){
     biaya:`<button class="btn btn-p" id="bAddExp"><i class="ti ti-plus"></i> Catat Biaya</button>`,
     konversi:`<button class="btn btn-p" id="bAddKonv"><i class="ti ti-plus"></i> Konversi Baru</button>`,
     do:`<button class="btn btn-p" id="bAddDO"><i class="ti ti-plus"></i> Buat DO</button>`,
-    lokasi:`<button class="btn btn-p" id="bAddLoc"><i class="ti ti-plus"></i> Tambah Lokasi</button>`,
+    settings:`<button class="btn btn-p" id="bAddLoc"><i class="ti ti-plus"></i> Tambah Lokasi</button>`,
   };
   return`<div class="layout">
   <div class="sidebar">
@@ -310,8 +310,7 @@ function layout(){
       ${navI('rekap','Rekap per Brand','rekap')}
       ${navI('refresh','Retur','retur')}
       ${navI('arrows-exchange','Konversi Stok','konversi')}
-      ${navI('truck-delivery','Delivery Order','do')}
-      ${navI('building','Manajemen Lokasi','lokasi')}
+      ${navI('truck-delivery','Delivery Order (DO)','do')}
       <div class="nl">Pembelian</div>
       ${navI('file-text','Purchase Order','po')}
       ${navI('arrow-bar-to-down','Pembelian','pembelian')}
@@ -324,6 +323,8 @@ function layout(){
       <div class="nl">Database</div>
       ${navI('truck','Supplier','supplier')}
       ${navI('users','Customer','customer')}
+      <div class="nl">System</div>
+      ${navI('map-pin','Lokasi & Gudang','settings')}
     </div>
     <div style="padding:12px;border-top:1px solid var(--bd)">
       <button class="btn btn-sm" style="width:100%;justify-content:center;margin-bottom:6px" id="bExp"><i class="ti ti-download"></i> Export Data</button>
@@ -337,7 +338,7 @@ function layout(){
   </div>${S.modal?modal():''}`;
 }
 function page(){
-  const m={dashboard:pgDash,analisis:pgAn,labarugi:pgLR,reminder:pgReminder,produk:pgProd,po:pgPO,pembelian:pgBuy,penjualan:pgSell,rekap:pgRekap,retur:pgRetur,konversi:pgKonversi,do:pgDO,lokasi:pgLokasi,piutang:pgPiutang,utang:pgUtang,biaya:pgBiaya,supplier:pgSup,customer:pgCust};
+  const m={dashboard:pgDash,analisis:pgAn,labarugi:pgLR,reminder:pgReminder,produk:pgProd,po:pgPO,pembelian:pgBuy,penjualan:pgSell,rekap:pgRekap,retur:pgRetur,konversi:pgKonversi,do:pgDO,piutang:pgPiutang,utang:pgUtang,biaya:pgBiaya,supplier:pgSup,customer:pgCust,settings:pgSettings};
   return (m[S.page]||(()=>''))();
 }
 
@@ -585,18 +586,20 @@ function pgProd(){
   });
   const thS=(lbl,key)=>{const act=sb===key,ic=act?(sd==='asc'?'↑':'↓'):'↕';
     return`<th style="cursor:pointer;user-select:none" data-sort="${key}">${lbl} <span style="font-size:10px;color:${act?'var(--acc)':'var(--t3)'}">${ic}</span></th>`;};
+  const locId=S.filterLoc||undefined;
   return`<div class="fb">
     <input id="iQ" placeholder="Cari SKU / nama..." value="${S.q}">
     <select id="sFb"><option value="">Semua Brand</option>${BRANDS.map(b=>`<option value="${b}" ${S.fb===b?'selected':''}>${b}</option>`).join('')}</select>
+    ${locFilterBar()}
     <select id="sSort" style="min-width:160px">${[['brand','Brand A-Z'],['sku','SKU A-Z'],['nama','Nama A-Z'],['stok','Stok Terbanyak'],['modal','Avg Modal Tertinggi'],['nilai','Nilai Stok Tertinggi']].map(([v,l])=>`<option value="${v}" ${sb===v?'selected':''}>${l}</option>`).join('')}</select>
     <button class="btn btn-sm" id="sSortDir">${sd==='asc'?'↑ Naik':'↓ Turun'}</button>
   </div>
   <div class="tw"><table><thead><tr>
     <th>Foto</th>${thS('SKU','sku')}${thS('Brand','brand')}${thS('Nama','nama')}
-    <th class="rt">Modal Awal</th>${thS('Avg Modal','modal')}${thS('Stok Bagus','stok')}<th class="rt">Stok Karatan</th>${thS('Nilai Stok','nilai')}<th></th>
+    <th class="rt">Modal/Unit</th>${thS('Avg Modal','modal')}${thS('Stok Real','stok')}<th class="rt">Stok Karatan</th>${thS('Nilai Stok','nilai')}<th></th>
   </tr></thead><tbody>
   ${!fl.length?`<tr><td colspan="10"><div class="empty"><i class="ti ti-package-off"></i><p>Belum ada produk</p></div></td></tr>`:
-  fl.map(p=>{const s=stats(p.sku);return`<tr>
+  fl.map(p=>{const s=stats(p.sku,locId);return`<tr>
     <td>${p.foto?`<div style="width:38px;height:38px;border-radius:6px;background:#F5F6FA url('${p.foto}') center/cover no-repeat;border:1px solid var(--bd)"></div>`:`<div style="width:38px;height:38px;border-radius:6px;background:#F5F6FA;border:1px solid var(--bd);display:flex;align-items:center;justify-content:center"><i class="ti ti-photo" style="color:#9CA3AF;font-size:16px"></i></div>`}</td>
     <td><span class="chip">${p.sku}</span></td><td><span class="bdg bb">${p.brand}</span></td><td>${p.nama}</td>
     <td class="rt">${rp(p.m)}</td><td class="rt o">${rp(s.avg)}</td>
@@ -721,7 +724,8 @@ function pgRekap(){
   </div>
   ${brands.map(br=>{
     const ps=S.products.filter(p=>p.brand===br);if(!ps.length)return'';
-    const bg=ps.reduce((a,p)=>a+stats(p.sku).stokBagus,0),kr=ps.reduce((a,p)=>a+(p.sk||0),0),ni=ps.reduce((a,p)=>{const s=stats(p.sku);return a+s.stokBagus*s.avg;},0);
+    const locId=S.filterLoc||undefined;
+    const bg=ps.reduce((a,p)=>a+stats(p.sku,locId).stokBagus,0),kr=ps.reduce((a,p)=>a+(p.sk||0),0),ni=ps.reduce((a,p)=>{const s=stats(p.sku,locId);return a+s.stokBagus*s.avg;},0);
     return`<div class="card" style="padding:0;overflow:hidden;margin-bottom:14px">
     <div style="padding:10px 16px;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;background:#FAFBFC">
       <strong style="font-size:13px">${br}</strong>
@@ -731,9 +735,16 @@ function pgRekap(){
       </div>
     </div>
     <div class="tw" style="border:none;border-radius:0"><table><thead><tr><th>SKU</th><th>Nama</th><th class="rt">Awal Bagus</th><th class="rt">Awal Karatan</th><th class="rt">Masuk</th><th class="rt">Keluar</th><th class="rt">Sisa Stok</th><th class="rt">Avg Modal</th><th class="rt">Nilai Stok</th></tr></thead><tbody>
-    ${ps.map(p=>{const s=stats(p.sku),tI=S.purchases.reduce((a,inv)=>a+(inv.items||[]).filter(x=>x.sku===p.sku).reduce((b,x)=>b+x.qty,0),0),tO=S.sales.reduce((a,inv)=>a+(inv.items||[]).filter(x=>x.sku===p.sku).reduce((b,x)=>b+x.qty,0),0);
-      return`<tr><td><span class="chip">${p.sku}</span></td><td>${p.nama}</td><td class="rt">${fmt(p.sb)}</td><td class="rt ${p.sk>0?'r':''}">${fmt(p.sk)}</td>
-        <td class="rt g">+${fmt(tI)}</td><td class="rt r">-${fmt(tO)}</td><td class="rt"><strong>${fmt(s.stokBagus)}</strong></td>
+    ${ps.map(p=>{
+      const s=stats(p.sku,locId);
+      const sbAwal=(p.stokAwal&&p.stokAwal.length)?(locId?((p.stokAwal.find(x=>x.locId===locId)||{}).sbAwal||0):p.stokAwal.reduce((a,x)=>a+x.sbAwal,0)):(p.sb||0);
+      const skAwal=(p.stokAwal&&p.stokAwal.length)?(locId?((p.stokAwal.find(x=>x.locId===locId)||{}).skAwal||0):p.stokAwal.reduce((a,x)=>a+x.skAwal,0)):(p.sk||0);
+      const buyF=locId?S.purchases.filter(x=>x.locId===locId):S.purchases;
+      const selF=locId?S.sales.filter(x=>x.locId===locId):S.sales;
+      const tI=buyF.reduce((a,inv)=>a+(inv.items||[]).filter(x=>x.sku===p.sku).reduce((b,x)=>b+x.qty,0),0);
+      const tO=selF.reduce((a,inv)=>a+(inv.items||[]).filter(x=>x.sku===p.sku).reduce((b,x)=>b+x.qty,0),0);
+      return`<tr><td><span class="chip">${p.sku}</span></td><td>${p.nama}</td><td class="rt">${fmt(sbAwal)}</td><td class="rt ${skAwal>0?'r':''}">${fmt(skAwal)}</td>
+        <td class="rt g">+${fmt(tI)}</td><td class="rt r">-${fmt(tO)}</td><td class="rt ${s.stokBagus<0?'r':''}"><strong>${fmt(s.stokBagus)}</strong></td>
         <td class="rt o">${rp(s.avg)}</td><td class="rt">${rp(s.stokBagus*s.avg)}</td></tr>`;}).join('')}
     </tbody></table></div></div>`;
   }).join('')}`;
@@ -811,36 +822,22 @@ function pgRetur(){
   </tbody></table></div>`;
 }
 
-// ═══ LOKASI HELPER ═══
-function locFilterBar(){
-  if(!S.locations.length)return'';
-  return`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-    <label style="font-size:11px;font-weight:700;color:var(--t2);margin:0;white-space:nowrap">Filter Lokasi:</label>
-    <select id="sFilterLoc" style="width:auto;min-width:160px">
-      <option value="">Semua Lokasi</option>
-      ${S.locations.map(l=>`<option value="${l.id}" ${S.filterLoc===l.id?'selected':''}>${l.nama}</option>`).join('')}
-    </select>
-  </div>`;
-}
-function locStokBadge(sku){
-  if(!S.locations.length)return'';
-  return`<div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap">
-    ${S.locations.map(loc=>{const s=statsLoc(sku,loc.id);const clr=s.stokBagus<0?'var(--err)':s.stokBagus===0?'var(--t3)':'var(--ok)';
-      return`<span style="font-size:10px;background:#F5F6FA;border:1px solid var(--bd);border-radius:4px;padding:1px 5px;color:${clr}">${loc.nama}: ${fmt(s.stokBagus)}</span>`;}).join('')}
-  </div>`;
-}
-
-// ═══ MANAJEMEN LOKASI ═══
-function pgLokasi(){
-  return`<div class="tw"><table><thead><tr><th>Nama Lokasi</th><th>Tipe</th><th>Keterangan</th><th class="rt">Total Nilai Stok</th><th></th></tr></thead><tbody>
-  ${!S.locations.length?`<tr><td colspan="5"><div class="empty"><i class="ti ti-building-off"></i><p>Belum ada lokasi. Tambahkan gudang atau toko kamu.</p></div></td></tr>`:
-  S.locations.map(loc=>{
-    const nilaiLoc=S.products.reduce((a,p)=>{const s=statsLoc(p.sku,loc.id);return a+s.stokBagus*stats(p.sku).avg;},0);
+// ═══ SETTINGS LOKASI ═══
+function pgSettings(){
+  const sortedLocs=[...S.locations].sort((a,b)=>a.nama.localeCompare(b.nama));
+  return`
+  <div class="fb"><input id="iQ" placeholder="Cari nama lokasi..." value="${S.q}"></div>
+  <div class="tw"><table><thead><tr><th>Nama Lokasi</th><th>Tipe</th><th>Catatan</th><th class="rt">Total SKU</th><th class="rt">Nilai Stok</th><th></th></tr></thead><tbody>
+  ${!S.locations.length?`<tr><td colspan="6"><div class="empty"><i class="ti ti-map-pin-off"></i><p>Belum ada lokasi. Tambahkan lokasi gudang atau toko kamu.</p></div></td></tr>`:
+  sortedLocs.filter(loc=>!S.q||loc.nama.toLowerCase().includes(S.q.toLowerCase())).map(loc=>{
+    const totalNilai=S.products.reduce((a,p)=>{const s=stats(p.sku,loc.id);return a+s.stokBagus*s.avg;},0);
+    const skuAda=S.products.filter(p=>stats(p.sku,loc.id).stokBagus!==0).length;
     return`<tr>
       <td><strong>${loc.nama}</strong></td>
-      <td><span class="bdg ${loc.tipe==='gudang'?'bb':loc.tipe==='toko'?'bg2':'bx'}">${{gudang:'Gudang',toko:'Toko',lainnya:'Lainnya'}[loc.tipe]||loc.tipe}</span></td>
-      <td class="tm">${loc.ket||'—'}</td>
-      <td class="rt">${rp(nilaiLoc)}</td>
+      <td><span class="bdg ${loc.tipe==='Gudang'?'bb':loc.tipe==='Toko'?'bg2':'bx'}">${loc.tipe}</span></td>
+      <td class="tm">${loc.catatan||'—'}</td>
+      <td class="rt">${skuAda} SKU</td>
+      <td class="rt o">${rp(totalNilai)}</td>
       <td style="white-space:nowrap">
         <button class="btn btn-ic btn-sm" data-eloc="${loc.id}"><i class="ti ti-edit"></i></button>
         <button class="btn btn-ic btn-sm btn-d" data-dloc="${loc.id}"><i class="ti ti-trash"></i></button>
@@ -848,37 +845,57 @@ function pgLokasi(){
     </tr>`;
   }).join('')}
   </tbody></table></div>
-  ${S.locations.length?`<div class="card" style="margin-top:14px"><div class="card-t">Rekap Stok per Lokasi</div>
-  <div class="tw" style="border:none"><table><thead><tr><th>Lokasi</th><th>SKU</th><th>Nama</th><th class="rt">Stok Bagus</th><th class="rt">Stok Karatan</th><th class="rt">Nilai Stok</th></tr></thead><tbody>
-  ${S.locations.flatMap(loc=>S.products.map(p=>{const s=statsLoc(p.sku,loc.id);if(!s.stokBagus&&!s.stokKaratan)return'';const avg=stats(p.sku).avg;
-    return`<tr><td><span class="bdg ${loc.tipe==='gudang'?'bb':'bg2'}">${loc.nama}</span></td><td><span class="chip">${p.sku}</span></td><td>${p.nama}</td>
-    <td class="rt ${s.stokBagus<0?'r':'g'}">${fmt(s.stokBagus)}</td><td class="rt ${s.stokKaratan<0?'r':''}">${fmt(s.stokKaratan)}</td><td class="rt">${rp(s.stokBagus*avg)}</td></tr>`;
-  })).filter(Boolean).join('')||`<tr><td colspan="6"><div class="empty" style="padding:20px"><p>Belum ada data stok per lokasi</p></div></td></tr>`}
-  </tbody></table></div></div>`:''}`;
+  ${S.locations.length?`<div class="card" style="margin-top:14px"><div class="card-t">Ringkasan Stok per Lokasi</div>
+  <div class="tw" style="border:none;padding:0"><table><thead><tr><th>Produk</th><th>SKU</th>${S.locations.map(l=>`<th class="rt">${l.nama}</th>`).join('')}<th class="rt">Total</th></tr></thead><tbody>
+  ${S.products.slice(0,30).map(p=>{
+    const locStoks=S.locations.map(l=>stats(p.sku,l.id).stokBagus);
+    const total=stats(p.sku).stokBagus;
+    if(locStoks.every(s=>s===0)&&total===0)return'';
+    return`<tr><td>${p.nama}</td><td><span class="chip">${p.sku}</span></td>${locStoks.map(s=>`<td class="rt ${s<0?'r':s>0?'g':''}">${fmt(s)}</td>`).join('')}<td class="rt"><strong>${fmt(total)}</strong></td></tr>`;
+  }).join('')}
+  </tbody></table></div>
+  ${S.products.length>30?`<div class="tm" style="font-size:11px;padding:10px">Menampilkan 30 produk pertama.</div>`:''}
+  </div>`:''}`;
 }
 
 // ═══ DELIVERY ORDER ═══
 function pgDO(){
   const fl=txFilter(S.deliveryOrders,x=>x.tgl,x=>x.noDO||'');
+  const filtered=fl.filter(x=>{
+    if(S.q&&!x.noDO?.toLowerCase().includes(S.q.toLowerCase())&&!x.catatan?.toLowerCase().includes(S.q.toLowerCase()))return false;
+    return true;
+  });
+  const pending=S.deliveryOrders.filter(x=>x.status==='sent');
   return txFilterBar('Cari No. DO...')+`
+  ${pending.length?`<div class="card" style="border-color:#F7C1C1;margin-bottom:14px">
+    <div class="card-t" style="color:var(--err)">⚠ Menunggu Konfirmasi Penerimaan (${pending.length})</div>
+    ${pending.map(d=>{
+      const fromL=S.locations.find(l=>l.id===d.fromLocId),toL=S.locations.find(l=>l.id===d.toLocId);
+      return`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--bd)">
+        <div><span class="chip">${d.noDO||'—'}</span> <span class="tm">${fd(d.tgl)}</span> · <strong>${fromL?fromL.nama:'?'}</strong> → <strong>${toL?toL.nama:'?'}</strong> · ${(d.items||[]).length} item</div>
+        <button class="btn btn-ok btn-sm" data-confirmdo="${d.id}"><i class="ti ti-check"></i> Konfirmasi Terima</button>
+      </div>`;
+    }).join('')}
+  </div>`:''}
   <div class="tw"><table><thead><tr><th>Tanggal</th><th>No. DO</th><th>Dari</th><th>Ke</th><th>Item</th><th>Status</th><th></th></tr></thead><tbody>
-  ${!fl.length?`<tr><td colspan="7"><div class="empty"><i class="ti ti-truck-off"></i><p>Belum ada Delivery Order</p></div></td></tr>`:
-  fl.map(do_=>{
-    const fromLoc=S.locations.find(l=>l.id===do_.fromLocId);
-    const toLoc=S.locations.find(l=>l.id===do_.toLocId);
-    const stBadge={draft:'<span class="bdg bx">Draft</span>',sent:'<span class="bdg bb">Dikirim</span>',confirmed:'<span class="bdg bg2">Dikonfirmasi</span>'}[do_.status]||'';
+  ${!filtered.length?`<tr><td colspan="7"><div class="empty"><i class="ti ti-truck-off"></i><p>Belum ada Delivery Order</p></div></td></tr>`:
+  filtered.map(d=>{
+    const fromL=S.locations.find(l=>l.id===d.fromLocId),toL=S.locations.find(l=>l.id===d.toLocId);
+    const stMap={draft:['bx','Draft'],sent:['bo','Dikirim'],confirmed:['bg2','Diterima'],cancelled:['br','Batal']};
+    const st=stMap[d.status]||stMap.draft;
     return`<tr>
-      <td class="nw">${fd(do_.tgl)}</td>
-      <td><span class="chip">${do_.noDO||'—'}</span></td>
-      <td>${fromLoc?`<span class="bdg ${fromLoc.tipe==='gudang'?'bb':'bg2'}">${fromLoc.nama}</span>`:'—'}</td>
-      <td>${toLoc?`<span class="bdg ${toLoc.tipe==='gudang'?'bb':'bg2'}">${toLoc.nama}</span>`:'—'}</td>
-      <td>${(do_.items||[]).map(i=>`<span class="chip" style="margin:1px">${i.sku}</span>`).join('')}</td>
-      <td>${stBadge}</td>
+      <td class="nw">${fd(d.tgl)}</td>
+      <td><span class="chip">${d.noDO||'—'}</span></td>
+      <td>${fromL?`<span class="bdg bb">${fromL.nama}</span>`:'—'}</td>
+      <td>${toL?`<span class="bdg bg2">${toL.nama}</span>`:'—'}</td>
+      <td>${(d.items||[]).map(i=>`<span class="chip" style="margin:1px">${i.sku}</span>`).join('')}</td>
+      <td><span class="bdg ${st[0]}">${st[1]}</span></td>
       <td style="white-space:nowrap">
-        <button class="btn btn-ic btn-sm bb" data-viewdo="${do_.id}" title="Lihat DO"><i class="ti ti-eye"></i></button>
-        ${do_.status!=='confirmed'?`<button class="btn btn-ic btn-sm" data-edo="${do_.id}" title="Edit"><i class="ti ti-edit"></i></button>`:''}
-        ${do_.status==='sent'?`<button class="btn btn-sm btn-ok" data-confirmdo="${do_.id}">Konfirmasi Terima</button>`:''}
-        ${do_.status!=='confirmed'?`<button class="btn btn-ic btn-sm btn-d" data-ddo="${do_.id}"><i class="ti ti-trash"></i></button>`:''}
+        <button class="btn btn-ic btn-sm" data-viewdo="${d.id}" title="Lihat"><i class="ti ti-eye"></i></button>
+        ${d.status==='draft'?`<button class="btn btn-ic btn-sm" data-edo="${d.id}" title="Edit"><i class="ti ti-edit"></i></button>`:''}
+        ${d.status==='draft'?`<button class="btn btn-sm btn-ok" data-senddo="${d.id}">Kirim</button>`:''}
+        ${d.status==='sent'?`<button class="btn btn-sm btn-ok" data-confirmdo="${d.id}">Konfirmasi</button>`:''}
+        ${d.status==='draft'?`<button class="btn btn-ic btn-sm btn-d" data-ddo="${d.id}"><i class="ti ti-trash"></i></button>`:''}
       </td>
     </tr>`;
   }).join('')}
@@ -926,6 +943,22 @@ function pgUtang(){
   buyOut.forEach(x=>{const paid=(x.payments||[]).reduce((b,p)=>b+(p.amountIDR||p.amount),0);const sisa=purchaseTotalIDR(x)-paid;
     const key=x.supId||'_none';if(!supRollup[key])supRollup[key]={count:0,total:0};supRollup[key].count++;supRollup[key].total+=sisa;});
   expOut.forEach(x=>{const key=x.supId||'_none';if(!supRollup[key])supRollup[key]={count:0,total:0};supRollup[key].count++;supRollup[key].total+=x.jumlah;});
+  // sort hutang pembelian
+  const sortU=S.sortBy||'tgl',sortD=S.sortDir||'desc';
+  const sortedBuyOut=[...buyOut].sort((a,b)=>{
+    const sa=S.suppliers.find(s=>s.id===a.supId),sb2=S.suppliers.find(s=>s.id===b.supId);
+    const paidA=(a.payments||[]).reduce((x,p)=>x+(p.amountIDR||p.amount),0);
+    const paidB=(b.payments||[]).reduce((x,p)=>x+(p.amountIDR||p.amount),0);
+    const sisaA=purchaseTotalIDR(a)-paidA,sisaB=purchaseTotalIDR(b)-paidB;
+    let va,vb;
+    if(sortU==='supplier'){va=sa?sa.nama:'';vb=sb2?sb2.nama:'';}
+    else if(sortU==='nilai'){va=sisaA;vb=sisaB;}
+    else if(sortU==='status'){va=a.payStatus;vb=b.payStatus;}
+    else if(sortU==='curr'){va=a.curr;vb=b.curr;}
+    else{va=new Date(a.tgl);vb=new Date(b.tgl);}
+    if(typeof va==='string')return sortD==='asc'?va.localeCompare(vb):vb.localeCompare(va);
+    return sortD==='asc'?va-vb:vb-va;
+  });
   return`
   <div class="mg">
     <div class="met"><div class="ml">Total Hutang Supplier</div><div class="mv r">${rp(tot)}</div><div class="ms">${buyOut.length+expOut.length} tagihan</div></div>
@@ -943,17 +976,28 @@ function pgUtang(){
     </tbody></table></div>
   </div>
   <div class="card" style="padding:0;overflow:hidden">
-    <div style="padding:10px 16px;border-bottom:1px solid var(--bd);background:#FAFBFC"><strong style="font-size:12px">RINCIAN HUTANG PEMBELIAN</strong></div>
-    <div class="tw" style="border:none;border-radius:0"><table><thead><tr><th>Tanggal</th><th>Invoice</th><th>Supplier</th><th>Mata Uang</th><th class="rt">Nilai (IDR)</th><th class="rt">Dibayar</th><th class="rt">Sisa</th><th></th></tr></thead><tbody>
-    ${!buyOut.length?`<tr><td colspan="8"><div class="empty" style="padding:20px"><i class="ti ti-circle-check"></i><p>Tidak ada hutang pembelian</p></div></td></tr>`:
-    buyOut.map(x=>{
+    <div style="padding:10px 16px;border-bottom:1px solid var(--bd);background:#FAFBFC;display:flex;justify-content:space-between;align-items:center">
+      <strong style="font-size:12px">RINCIAN HUTANG PEMBELIAN</strong>
+      <div style="display:flex;gap:8px">
+        <select id="sSort" style="font-size:11px;padding:4px 8px">
+          ${[['tgl','Tanggal'],['supplier','Supplier'],['nilai','Nilai Sisa'],['status','Status'],['curr','Mata Uang']].map(([v,l])=>`<option value="${v}" ${sortU===v?'selected':''}>${l}</option>`).join('')}
+        </select>
+        <button class="btn btn-sm" id="sSortDir">${sortD==='asc'?'↑':'↓'}</button>
+      </div>
+    </div>
+    <div class="tw" style="border:none;border-radius:0"><table><thead><tr><th>Tanggal</th><th>Invoice</th><th>Supplier</th><th>Mata Uang</th><th class="rt">Nilai (IDR)</th><th class="rt">Dibayar</th><th class="rt">Sisa</th><th>Status</th><th></th></tr></thead><tbody>
+    ${!sortedBuyOut.length?`<tr><td colspan="9"><div class="empty" style="padding:20px"><i class="ti ti-circle-check"></i><p>Tidak ada hutang pembelian</p></div></td></tr>`:
+    sortedBuyOut.map(x=>{
       const s=S.suppliers.find(ss=>ss.id===x.supId);
       const paid=(x.payments||[]).reduce((a,p)=>a+(p.amountIDR||p.amount),0);
       const tIDR=purchaseTotalIDR(x),sisa=tIDR-paid;
-      return`<tr><td class="nw">${fd(x.tgl)}</td><td><span class="chip">${x.inv||'—'}</span></td>
+      const stBadge=paid===0?'<span class="pay-badge outstanding">Belum Bayar</span>':'<span class="pay-badge partial">Sebagian</span>';
+      return`<tr><td class="nw">${fd(x.tgl)}</td>
+        <td><span class="chip" data-viewbuy="${x.id}" style="cursor:pointer;color:var(--acc)">${x.inv||'—'} <i class="ti ti-external-link" style="font-size:9px"></i></span></td>
         <td>${s?s.nama:'—'}</td><td>${x.curr}${x.curr!=='IDR'?` @${fmt(x.rate)}`:''}</td>
         <td class="rt">${rp(tIDR)}</td><td class="rt g">${rp(paid)}</td>
         <td class="rt r"><strong>${rp(sisa)}</strong></td>
+        <td>${stBadge}</td>
         <td><button class="btn btn-ic btn-sm btn-ok" data-paybuy="${x.id}"><i class="ti ti-cash"></i></button></td></tr>`;
     }).join('')}
     </tbody></table></div>
@@ -1032,21 +1076,16 @@ function modal(){
       <div class="fr"><label>Nama Barang</label><input id="fNm" value="${d.nama||''}" placeholder="Nama lengkap produk"></div>
       <div class="fr c3">
         <div><label>Modal Awal (Rp)</label><input id="fMd" type="number" value="${d.m||0}" min="0"></div>
-        <div><label>Stok Awal Bagus (Total)</label><input id="fSb" type="number" value="${d.sb||0}" min="0" ${S.locations.length?'style="background:#fffbe6" title="Gunakan stok per lokasi jika multi-gudang aktif"':''}></div>
-        <div><label>Stok Awal Karatan</label><input id="fSk2" type="number" value="${d.sk||0}" min="0"></div>
+        <div><label>Stok Awal Bagus (Legacy/Total)</label><input id="fSb" type="number" value="${d.sb||0}" min="0"></div>
+        <div><label>Stok Awal Karatan (Legacy)</label><input id="fSk2" type="number" value="${d.sk||0}" min="0"></div>
       </div>
-      ${S.locations.length?`<div class="card" style="padding:12px;margin-bottom:0">
-        <div class="card-t" style="margin-bottom:8px">Stok Awal per Lokasi <span class="tm">(isi untuk aktifkan multi-gudang)</span></div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px">
-          ${S.locations.map(loc=>{const ex=(d.stokAwal||[]).find(s=>s.locId===loc.id)||{};return`<div style="padding:8px;border:1px solid var(--bd);border-radius:7px;background:#FAFBFC">
-            <div style="font-weight:600;font-size:12px;margin-bottom:6px">${loc.nama}</div>
-            <div class="fr c2" style="margin-bottom:0;gap:6px">
-              <div><label style="font-size:10px">Stok Bagus</label><input class="fLocSb" data-locid="${loc.id}" type="number" value="${ex.sbAwal||0}" min="0" style="font-size:12px;padding:5px 8px"></div>
-              <div><label style="font-size:10px">Stok Karatan</label><input class="fLocSk" data-locid="${loc.id}" type="number" value="${ex.skAwal||0}" min="0" style="font-size:12px;padding:5px 8px"></div>
-            </div>
-          </div>`;}).join('')}
-        </div>
-      </div>`:''}
+      ${S.locations.length?`<div class="divider"></div>
+      <div style="font-size:11px;font-weight:700;color:var(--t2);margin-bottom:8px">STOK AWAL PER LOKASI <span style="font-weight:400">(opsional — untuk multi-gudang)</span></div>
+      ${S.locations.map(loc=>{const la=(d.stokAwal||[]).find(x=>x.locId===loc.id)||{sbAwal:0,skAwal:0};return`<div style="display:grid;grid-template-columns:140px 1fr 1fr;gap:8px;align-items:center;margin-bottom:6px">
+        <label style="margin:0;font-weight:600">${loc.nama}</label>
+        <div><label style="font-size:10px">Bagus</label><input class="locSb" type="number" value="${la.sbAwal}" min="0" data-locid="${loc.id}" style="padding:6px 8px"></div>
+        <div><label style="font-size:10px">Karatan</label><input class="locSk" type="number" value="${la.skAwal}" min="0" data-locid="${loc.id}" style="padding:6px 8px"></div>
+      </div>`;}).join('')}`:''}
       <div class="fr"><label>Foto Produk (Opsional)</label>
         <div style="display:flex;gap:12px;align-items:center">
           <div id="fotoPreview" style="width:80px;height:80px;border:1px solid var(--bd);border-radius:8px;background:#F5F6FA url('${d.foto||''}') center/cover no-repeat;flex-shrink:0;display:flex;align-items:center;justify-content:center">
@@ -1081,9 +1120,12 @@ function modal(){
           <option value="cancelled" ${d.status==='cancelled'?'selected':''}>Dibatalkan</option>
         </select></div>
       </div>
-      <div class="fr c3">
+      <div class="fr c2">
         <div><label>Mata Uang</label><select id="fCurr">${CURRENCIES.map(c=>`<option value="${c}" ${d.curr===c?'selected':''}>${c}</option>`).join('')}</select></div>
         <div><label>Rate ke IDR (1 unit = Rp ...)</label><input id="fRate" type="number" value="${d.rate||1}" min="0" step="0.01"></div>
+      </div>
+      <div class="fr c2">
+        <div><label>Tujuan Lokasi Gudang</label><select id="fLocPO">${S.locations.length?S.locations.map(l=>`<option value="${l.id}" ${d.locId===l.id?'selected':''}>${l.nama}</option>`).join(''):'<option value="">— Belum ada lokasi —</option>'}</select></div>
         <div><label>Payment Term</label><select id="fPt">
           <option value="cash" ${d.payTerm!=='credit'?'selected':''}>Cash / Lunas saat terima</option>
           <option value="credit" ${d.payTerm==='credit'?'selected':''}>Credit Term (jadi utang)</option>
@@ -1120,9 +1162,10 @@ function modal(){
         <div><label>No. Invoice</label><input id="fIn" value="${d.inv||''}" placeholder="INV-001"></div>
         <div><label>Supplier</label><select id="fSup"><option value="">— Pilih —</option>${supOpts}</select></div>
       </div>
-      <div class="fr c2">
+      <div class="fr c3">
+        <div><label>Masuk ke Lokasi</label><select id="fLocBuy">${S.locations.length?S.locations.map(l=>`<option value="${l.id}" ${d.locId===l.id?'selected':''}>${l.nama}</option>`).join(''):'<option value="">— Belum ada lokasi —</option>'}</select></div>
         <div><label>Mata Uang</label><select id="fCurr">${CURRENCIES.map(c=>`<option value="${c}" ${d.curr===c?'selected':''}>${c}</option>`).join('')}</select></div>
-        <div><label>Rate ke IDR (1 unit = Rp ...)</label><input id="fRate" type="number" value="${d.rate||1}" min="0" step="0.01"></div>
+        <div><label>Rate ke IDR</label><input id="fRate" type="number" value="${d.rate||1}" min="0" step="0.01"></div>
       </div>
       <div class="divider"></div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
@@ -1156,6 +1199,7 @@ function modal(){
       </div>
       <div class="fr c3">
         <div><label>Channel</label><select id="fCh"><option value="Online" ${d.ch==='Online'?'selected':''}>Online (Marketplace)</option><option value="Offline" ${d.ch==='Offline'?'selected':''}>Offline (Toko)</option></select></div>
+        <div><label>Jual dari Lokasi</label><select id="fLocSell">${S.locations.length?S.locations.map(l=>`<option value="${l.id}" ${d.locId===l.id?'selected':''}>${l.nama}</option>`).join(''):'<option value="">— Belum ada lokasi —</option>'}</select></div>
         <div><label>Payment Term</label><select id="fPt">
           <option value="cash" ${d.payTerm!=='credit'&&d.payTerm!=='cod'?'selected':''}>Cash</option>
           <option value="credit" ${d.payTerm==='credit'?'selected':''}>Credit Term</option>
@@ -1501,97 +1545,6 @@ function modal(){
   </div></div>`;
   }
 
-  // MANAJEMEN LOKASI
-  if(type==='lokasi'){
-    const isEdit=!!d.id;
-    return`<div class="ov" id="mOv"><div class="modal">
-    <div class="mh"><h3>${isEdit?'Edit Lokasi':'Tambah Lokasi'}</h3><button class="btn btn-ic" id="bCl"><i class="ti ti-x"></i></button></div>
-    <div class="mb">
-      <div class="fr"><label>Nama Lokasi *</label><input id="fLocNama" value="${d.nama||''}" placeholder="Gudang Jakarta / Toko MDN"></div>
-      <div class="fr c2">
-        <div><label>Tipe</label><select id="fLocTipe">
-          <option value="gudang" ${d.tipe==='gudang'||!d.tipe?'selected':''}>Gudang</option>
-          <option value="toko" ${d.tipe==='toko'?'selected':''}>Toko</option>
-          <option value="lainnya" ${d.tipe==='lainnya'?'selected':''}>Lainnya</option>
-        </select></div>
-        <div><label>Keterangan (Opsional)</label><input id="fLocKet" value="${d.ket||''}" placeholder="Alamat / catatan"></div>
-      </div>
-    </div>
-    <div class="mf"><button class="btn" id="bCl2">Batal</button><button class="btn btn-p" id="bSvLoc" data-id="${d.id||''}">Simpan</button></div>
-  </div></div>`;
-  }
-
-  // DELIVERY ORDER
-  if(type==='do'||type==='editDO'){
-    const isEdit=type==='editDO';
-    const locOpts=S.locations.map(l=>`<option value="${l.id}" ${d.fromLocId===l.id?'selected':''}>${l.nama}</option>`).join('');
-    const locOptsTo=S.locations.map(l=>`<option value="${l.id}" ${d.toLocId===l.id?'selected':''}>${l.nama}</option>`).join('');
-    const skuOpts=S.products.map(p=>`<option value="${p.sku}">${p.sku} — ${p.nama}</option>`).join('');
-    const items=d.items||[{sku:'',qty:1}];
-    return`<div class="ov" id="mOv"><div class="modal modal-lg">
-    <div class="mh"><h3>${isEdit?'Edit DO':'Buat Delivery Order'}</h3><button class="btn btn-ic" id="bCl"><i class="ti ti-x"></i></button></div>
-    <div class="mb">
-      <div class="fr c3">
-        <div><label>Tanggal</label><input id="fTg" type="date" value="${d.tgl||today()}"></div>
-        <div><label>No. DO</label><input id="fNoDO" value="${d.noDO||''}" placeholder="DO-001"></div>
-        <div><label>Catatan</label><input id="fDoCat" value="${d.catatan||''}" placeholder="Opsional"></div>
-      </div>
-      <div class="fr c2">
-        <div><label>Dari Lokasi *</label><select id="fFromLoc"><option value="">— Pilih —</option>${locOpts}</select></div>
-        <div><label>Ke Lokasi *</label><select id="fToLoc"><option value="">— Pilih —</option>${locOptsTo}</select></div>
-      </div>
-      ${!S.locations.length?`<div class="ib" style="margin-bottom:8px">⚠ Belum ada lokasi. Tambahkan lokasi dulu di menu Manajemen Lokasi.</div>`:''}
-      <div class="divider"></div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <label style="margin:0">Item yang Dikirim</label>
-        <button class="btn btn-sm btn-p" id="bAddItemDO"><i class="ti ti-plus"></i> Tambah SKU</button>
-      </div>
-      <div style="font-size:11px;color:var(--t2);display:grid;grid-template-columns:1fr 130px 36px;gap:6px;padding:0 8px;margin-bottom:4px">
-        <span>SKU / Produk</span><span>Qty</span><span></span>
-      </div>
-      <div id="doItemList">${items.map((it,i)=>`<div class="doLine" data-idx="${i}" style="display:grid;grid-template-columns:1fr 130px 36px;gap:6px;align-items:center;padding:7px;background:#FAFBFC;border:1px solid var(--bd);border-radius:7px;margin-bottom:6px">
-        <select class="doSku"><option value="">— SKU —</option>${S.products.map(p=>`<option value="${p.sku}" ${it.sku===p.sku?'selected':''}>${p.sku} — ${p.nama}</option>`).join('')}</select>
-        <input class="doQty" type="number" value="${it.qty||1}" min="1" placeholder="Qty">
-        <button class="btn btn-ic btn-sm btn-d doRem"><i class="ti ti-minus"></i></button>
-      </div>`).join('')}</div>
-    </div>
-    <div class="mf"><button class="btn" id="bCl2">Batal</button><button class="btn btn-p" id="bSvDO" data-id="${d.id||''}">Simpan DO</button></div>
-  </div></div>`;
-  }
-
-  // VIEW DO
-  if(type==='viewDO'){
-    const do_=S.deliveryOrders.find(x=>x.id===d.id)||{};
-    const fromLoc=S.locations.find(l=>l.id===do_.fromLocId);
-    const toLoc=S.locations.find(l=>l.id===do_.toLocId);
-    const stLabel={draft:'Draft',sent:'Dikirim — Menunggu Konfirmasi Penerima',confirmed:`Dikonfirmasi Diterima (${fd(do_.confirmedTgl)})`}[do_.status]||'—';
-    return`<div class="ov" id="mOv"><div class="modal modal-lg">
-    <div class="mh"><h3>Detail DO — ${do_.noDO||'—'}</h3><button class="btn btn-ic" id="bCl"><i class="ti ti-x"></i></button></div>
-    <div class="mb">
-      <div class="fr c2" style="margin-bottom:14px">
-        <div><div class="tm" style="margin-bottom:3px">Tanggal</div><strong>${fd(do_.tgl)}</strong></div>
-        <div><div class="tm" style="margin-bottom:3px">Status</div><strong>${stLabel}</strong></div>
-      </div>
-      <div class="fr c2" style="margin-bottom:14px">
-        <div><div class="tm" style="margin-bottom:3px">Dari</div><strong>${fromLoc?fromLoc.nama:'—'}</strong></div>
-        <div><div class="tm" style="margin-bottom:3px">Ke</div><strong>${toLoc?toLoc.nama:'—'}</strong></div>
-      </div>
-      <div class="tw"><table>
-        <thead><tr><th>#</th><th>SKU</th><th>Nama Barang</th><th class="rt">Qty Dikirim</th><th class="rt">Stok di Sumber</th></tr></thead>
-        <tbody>${(do_.items||[]).map((it,n)=>{const p=S.products.find(pp=>pp.sku===it.sku);const s=fromLoc?statsLoc(it.sku,fromLoc.id):stats(it.sku);
-          return`<tr><td>${n+1}</td><td><span class="chip">${it.sku}</span></td><td>${p?p.nama:'—'}</td><td class="rt">${fmt(it.qty)}</td><td class="rt ${s.stokBagus<0?'r':'g'}">${fmt(s.stokBagus)}</td></tr>`;}).join('')}
-        </tbody>
-      </table></div>
-      ${do_.catatan?`<div class="ib" style="margin-top:12px"><strong>Catatan:</strong> ${do_.catatan}</div>`:''}
-      ${do_.status==='sent'?`<div style="padding:12px;background:var(--warnl);border-radius:8px;margin-top:12px;font-size:12px"><strong>⚠ Stok belum bergerak</strong> — Stok akan berpindah dari ${fromLoc?fromLoc.nama:'sumber'} ke ${toLoc?toLoc.nama:'tujuan'} setelah penerima mengkonfirmasi penerimaan.</div>`:''}
-    </div>
-    <div class="mf">
-      ${do_.status!=='confirmed'?`<button class="btn btn-p btn-ok" data-confirmdo="${do_.id}" id="bConfFromView">✓ Konfirmasi Terima Barang</button>`:''}
-      <button class="btn" id="bCl2">Tutup</button>
-    </div>
-  </div></div>`;
-  }
-
   // IMPORT MARKETPLACE (SKU & Penjualan)
   if(type==='import'){
     const imp=S.imp||{};
@@ -1723,6 +1676,55 @@ function modal(){
   </div></div>`;
   }
 
+  // VIEW DETAIL PEMBELIAN
+  if(type==='viewBuy'){
+    const b=S.purchases.find(x=>x.id===d.id)||{};
+    const sup=S.suppliers.find(s=>s.id===b.supId);
+    const loc=S.locations.find(l=>l.id===b.locId);
+    const paid=(b.payments||[]).reduce((a,p)=>a+(p.amountIDR||p.amount),0);
+    const tIDR=purchaseTotalIDR(b),sisa=tIDR-paid;
+    return`<div class="ov" id="mOv"><div class="modal modal-lg">
+    <div class="mh"><h3>Detail Pembelian — ${b.inv||'—'}</h3><button class="btn btn-ic" id="bCl"><i class="ti ti-x"></i></button></div>
+    <div class="mb">
+      <div class="fr c3" style="margin-bottom:14px">
+        <div><div class="tm">Tanggal</div><strong>${fd(b.tgl)}</strong></div>
+        <div><div class="tm">Supplier</div><strong>${sup?sup.nama:'—'}</strong></div>
+        <div><div class="tm">Lokasi Masuk</div><strong>${loc?loc.nama:'—'}</strong></div>
+      </div>
+      <div class="fr c2" style="margin-bottom:14px">
+        <div><div class="tm">Mata Uang</div><strong>${b.curr}${b.curr!=='IDR'?' @ '+fmt(b.rate)+' IDR':''}</strong></div>
+        <div><div class="tm">Payment Term</div><strong>${b.payTerm==='credit'?'Credit Term':'Cash'}</strong></div>
+      </div>
+      <div class="tw"><table>
+        <thead><tr><th>#</th><th>SKU</th><th>Nama</th><th class="rt">Harga List</th><th class="rt">Disc%</th><th class="rt">Harga Net</th><th class="rt">Qty</th><th class="rt">Total (IDR)</th></tr></thead>
+        <tbody>${(b.items||[]).map((i,n)=>`<tr>
+          <td>${n+1}</td><td><span class="chip">${i.sku}</span></td><td>${i.nama||'—'}</td>
+          <td class="rt">${cur(i.hargaListAsli||0,b.curr)}</td>
+          <td class="rt">${i.disc||0}%</td>
+          <td class="rt">${cur(i.hargaNetAsli||0,b.curr)}</td>
+          <td class="rt">${fmt(i.qty)}</td>
+          <td class="rt">${rp(i.totalIDR||i.total||0)}</td>
+        </tr>`).join('')}
+        <tr style="background:#FAFBFC;font-weight:700"><td colspan="7" class="rt">TOTAL (IDR)</td><td class="rt">${rp(tIDR)}</td></tr>
+        </tbody>
+      </table></div>
+      <div class="sb" style="margin-top:14px">
+        <div class="row"><span>Total</span><span>${rp(tIDR)}</span></div>
+        <div class="row"><span>Sudah Dibayar</span><span class="g">${rp(paid)}</span></div>
+        <div class="row"><span>Sisa Hutang</span><strong class="${sisa>0?'r':''}">${rp(sisa)}</strong></div>
+      </div>
+      ${(b.payments||[]).length?`<div style="margin-top:12px"><div style="font-size:11px;font-weight:700;color:var(--t2);margin-bottom:6px">RIWAYAT PEMBAYARAN</div>
+      <table><thead><tr><th>Tanggal</th><th>Metode</th><th>Mata Uang</th><th class="rt">Jumlah</th><th class="rt">IDR</th></tr></thead><tbody>
+      ${b.payments.map(p=>`<tr><td>${fd(p.tgl)}</td><td>${p.met}</td><td>${p.curr||'IDR'}</td><td class="rt">${cur(p.amount,p.curr)}</td><td class="rt g">${rp(p.amountIDR||p.amount)}</td></tr>`).join('')}
+      </tbody></table></div>`:''}
+    </div>
+    <div class="mf">
+      ${sisa>0?`<button class="btn btn-ok" data-paybuy="${b.id}"><i class="ti ti-cash"></i> Catat Pembayaran</button>`:''}
+      <button class="btn btn-p" id="bCl2">Tutup</button>
+    </div>
+  </div></div>`;
+  }
+
   // EDIT CICILAN PIUTANG
   if(type==='editPaySell'){
     const {saleId,payId}=d;
@@ -1800,6 +1802,96 @@ function modal(){
       </div>
     </div>
     <div class="mf"><button class="btn" id="bCl2">Batal</button><button class="btn btn-p" id="bSvKonv">Simpan Konversi</button></div>
+  </div></div>`;
+  }
+
+  // LOKASI / GUDANG
+  if(type==='loc'){
+    return`<div class="ov" id="mOv"><div class="modal">
+    <div class="mh"><h3>${d.id?'Edit Lokasi':'Tambah Lokasi'}</h3><button class="btn btn-ic" id="bCl"><i class="ti ti-x"></i></button></div>
+    <div class="mb">
+      <div class="fr c2">
+        <div><label>Nama Lokasi *</label><input id="fNm" value="${d.nama||''}" placeholder="Contoh: Gudang Jakarta"></div>
+        <div><label>Tipe</label><select id="fTipeLoc"><option value="Gudang" ${d.tipe==='Gudang'||!d.tipe?'selected':''}>Gudang</option><option value="Toko" ${d.tipe==='Toko'?'selected':''}>Toko</option><option value="Lainnya" ${d.tipe==='Lainnya'?'selected':''}>Lainnya</option></select></div>
+      </div>
+      <div class="fr"><label>Catatan (Opsional)</label><input id="fCatatan" value="${d.catatan||''}" placeholder="Alamat, keterangan..."></div>
+    </div>
+    <div class="mf"><button class="btn" id="bCl2">Batal</button><button class="btn btn-p" id="bSvLoc" data-id="${d.id||''}">Simpan</button></div>
+  </div></div>`;
+  }
+
+  // DELIVERY ORDER
+  if(type==='do'){
+    const isEdit=!!d.id;
+    const locOpts=S.locations.map(l=>`<option value="${l.id}">${l.nama} (${l.tipe})</option>`).join('');
+    const items=d.items||[{sku:'',qty:1}];
+    const fromSel=S.locations.map(l=>`<option value="${l.id}" ${d.fromLocId===l.id?'selected':''}>${l.nama}</option>`).join('');
+    const toSel=S.locations.map(l=>`<option value="${l.id}" ${d.toLocId===l.id?'selected':''}>${l.nama}</option>`).join('');
+    const skuOpts=S.products.map(p=>`<option value="${p.sku}">${p.sku} — ${p.nama}</option>`).join('');
+    return`<div class="ov" id="mOv"><div class="modal modal-lg">
+    <div class="mh"><h3>${isEdit?'Edit DO':'Buat Delivery Order'}</h3><button class="btn btn-ic" id="bCl"><i class="ti ti-x"></i></button></div>
+    <div class="mb">
+      <div class="fr c3">
+        <div><label>Tanggal</label><input id="fTg" type="date" value="${d.tgl||today()}"></div>
+        <div><label>No. DO</label><input id="fNoDO" value="${d.noDO||''}" placeholder="DO-001"></div>
+        <div><label>Catatan</label><input id="fCatatan" value="${d.catatan||''}" placeholder="Tujuan / keterangan..."></div>
+      </div>
+      <div class="fr c2">
+        <div><label>Dari Lokasi *</label><select id="fFromLoc"><option value="">— Pilih —</option>${fromSel}</select></div>
+        <div><label>Ke Lokasi *</label><select id="fToLoc"><option value="">— Pilih —</option>${toSel}</select></div>
+      </div>
+      <div class="divider"></div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+        <label style="margin:0">Item yang Dikirim</label>
+        <button class="btn btn-sm btn-p" id="bAddItemDO"><i class="ti ti-plus"></i> Tambah</button>
+      </div>
+      <div style="font-size:11px;color:var(--t2);display:grid;grid-template-columns:2fr 120px 36px;gap:6px;padding:0 8px;margin-bottom:4px">
+        <span>SKU / Produk</span><span>Qty</span><span></span>
+      </div>
+      <div id="doItemList">
+        ${items.map((it,i)=>`<div class="doItemLine" style="display:grid;grid-template-columns:2fr 120px 36px;gap:6px;margin-bottom:6px;align-items:center">
+          <select class="doSku"><option value="">— Pilih SKU —</option>${S.products.map(p=>`<option value="${p.sku}" ${it.sku===p.sku?'selected':''}>${p.sku} — ${p.nama}</option>`).join('')}</select>
+          <input class="doQty" type="number" value="${it.qty||1}" min="1" style="padding:8px;border:1px solid var(--bd);border-radius:7px">
+          <button class="btn btn-ic btn-sm btn-d doRemLine"><i class="ti ti-minus"></i></button>
+        </div>`).join('')}
+      </div>
+      <div class="ib" style="margin-top:8px;font-size:11px">Stok akan bergerak dari lokasi sumber ke tujuan <strong>hanya setelah penerima klik "Konfirmasi Terima"</strong>.</div>
+    </div>
+    <div class="mf"><button class="btn" id="bCl2">Batal</button><button class="btn btn-p" id="bSvDO" data-id="${d.id||''}">Simpan DO</button></div>
+  </div></div>`;
+  }
+
+  // VIEW DO DETAIL
+  if(type==='viewDO'){
+    const d2=S.deliveryOrders.find(x=>x.id===d.id)||{};
+    const fromL=S.locations.find(l=>l.id===d2.fromLocId),toL=S.locations.find(l=>l.id===d2.toLocId);
+    const stMap={draft:'Draft',sent:'Dikirim (menunggu konfirmasi)',confirmed:'Diterima & Dikonfirmasi',cancelled:'Dibatalkan'};
+    return`<div class="ov" id="mOv"><div class="modal modal-lg">
+    <div class="mh"><h3>Detail DO — ${d2.noDO||'—'}</h3><button class="btn btn-ic" id="bCl"><i class="ti ti-x"></i></button></div>
+    <div class="mb">
+      <div class="fr c2" style="margin-bottom:14px">
+        <div><div class="tm" style="margin-bottom:3px">Dari</div><strong>${fromL?fromL.nama:'—'}</strong></div>
+        <div><div class="tm" style="margin-bottom:3px">Ke</div><strong>${toL?toL.nama:'—'}</strong></div>
+        <div><div class="tm" style="margin-bottom:3px">Tanggal Dibuat</div><strong>${fd(d2.tgl)}</strong></div>
+        <div><div class="tm" style="margin-bottom:3px">Status</div><strong>${stMap[d2.status]||'—'}</strong></div>
+      </div>
+      ${d2.confirmedTgl?`<div class="ib" style="background:var(--okl)">Dikonfirmasi diterima pada: <strong>${fd(d2.confirmedTgl)}</strong></div>`:''}
+      <div class="tw"><table>
+        <thead><tr><th>#</th><th>SKU</th><th>Nama Barang</th><th class="rt">Qty Dikirim</th><th class="rt">Stok Sumber (sekarang)</th></tr></thead>
+        <tbody>${(d2.items||[]).map((it,i)=>{
+          const p=S.products.find(pp=>pp.sku===it.sku);
+          const s=fromL?stats(it.sku,fromL.id):stats(it.sku);
+          return`<tr><td>${i+1}</td><td><span class="chip">${it.sku}</span></td><td>${p?p.nama:'—'}</td>
+            <td class="rt">${fmt(it.qty)}</td>
+            <td class="rt ${s.stokBagus<0?'r':''}">${fmt(s.stokBagus)}</td></tr>`;}).join('')}
+        </tbody>
+      </table></div>
+      ${d2.catatan?`<div class="ib" style="margin-top:10px"><strong>Catatan:</strong> ${d2.catatan}</div>`:''}
+    </div>
+    <div class="mf">
+      ${d2.status==='sent'?`<button class="btn btn-ok" data-confirmdo="${d2.id}" id="bConfFromView"><i class="ti ti-check"></i> Konfirmasi Terima Barang</button>`:''}
+      <button class="btn btn-p" id="bCl2">Tutup</button>
+    </div>
   </div></div>`;
   }
   return'';
@@ -2150,14 +2242,19 @@ function impCommitSell(parsed){
 // ═══ EVENT BINDINGS ═══
 function bind(){
   document.querySelectorAll('[data-nav]').forEach(el=>el.addEventListener('click',()=>{S.page=el.dataset.nav;S.q='';S.fb='';render();}));
+  // debounced search — prevents hang, restores focus
+  let _sTimer=null;
   document.getElementById('iQ')?.addEventListener('input',e=>{
     S.q=e.target.value;
-    const tw=document.querySelector('.content .tw');
-    if(tw){
-      const fresh=document.createElement('div');fresh.innerHTML=page();
-      const newTw=fresh.querySelector('.tw');
-      if(newTw){tw.replaceWith(newTw);bind();}else renderContent();
-    }else renderContent();
+    if(_sTimer)clearTimeout(_sTimer);
+    _sTimer=setTimeout(()=>{
+      const c=document.querySelector('.content');if(!c)return;
+      const q=S.q;
+      c.innerHTML=page();
+      const inp=c.querySelector('#iQ');
+      if(inp){inp.value=q;inp.focus();try{inp.setSelectionRange(q.length,q.length);}catch(e){}}
+      bind();
+    },200);
   });
   document.getElementById('sFb')?.addEventListener('change',e=>{S.fb=e.target.value;render();});
   document.getElementById('sFilterLoc')?.addEventListener('change',e=>{S.filterLoc=e.target.value;render();});
@@ -2192,18 +2289,18 @@ function bind(){
   document.getElementById('bAddExp')?.addEventListener('click',()=>{S.modal={type:'exp',data:{}};render();bm();});
   document.getElementById('bAddRet')?.addEventListener('click',()=>{S.modal={type:'ret',data:{}};render();bm();});
   document.getElementById('bAddKonv')?.addEventListener('click',()=>{S.modal={type:'konversi',data:{}};render();bm();});
-  document.getElementById('bAddLoc')?.addEventListener('click',()=>{S.modal={type:'lokasi',data:{}};render();bm();});
+  // LOKASI
+  document.getElementById('bAddLoc')?.addEventListener('click',()=>{S.modal={type:'loc',data:{}};render();bm();});
+  document.querySelectorAll('[data-eloc]').forEach(el=>el.addEventListener('click',()=>{const l=S.locations.find(x=>x.id===el.dataset.eloc);if(l){S.modal={type:'loc',data:{...l}};render();bm();}}));
+  document.querySelectorAll('[data-dloc]').forEach(el=>el.addEventListener('click',()=>{if(confirm('Hapus lokasi ini? Data stok awal di lokasi ini akan hilang.')){S.locations=S.locations.filter(x=>x.id!==el.dataset.dloc);save();render();}}));
+  // DO
   document.getElementById('bAddDO')?.addEventListener('click',()=>{S.modal={type:'do',data:{}};render();bm();});
-  document.querySelectorAll('[data-eloc]').forEach(el=>el.addEventListener('click',()=>{const l=S.locations.find(x=>x.id===el.dataset.eloc);if(l){S.modal={type:'lokasi',data:{...l}};render();bm();}}));
-  document.querySelectorAll('[data-dloc]').forEach(el=>el.addEventListener('click',()=>{if(confirm('Hapus lokasi ini?')){S.locations=S.locations.filter(x=>x.id!==el.dataset.dloc);save();render();}}));
-  document.querySelectorAll('[data-edo]').forEach(el=>el.addEventListener('click',()=>{const do_=S.deliveryOrders.find(x=>x.id===el.dataset.edo);if(do_){S.modal={type:'editDO',data:{...do_}};render();bm();}}));
-  document.querySelectorAll('[data-ddo]').forEach(el=>el.addEventListener('click',()=>{if(confirm('Hapus DO ini?')){S.deliveryOrders=S.deliveryOrders.filter(x=>x.id!==el.dataset.ddo);save();render();}}));
   document.querySelectorAll('[data-viewdo]').forEach(el=>el.addEventListener('click',()=>{S.modal={type:'viewDO',data:{id:el.dataset.viewdo}};render();bm();}));
-  document.querySelectorAll('[data-confirmdo]').forEach(el=>el.addEventListener('click',()=>{
-    if(!confirm('Konfirmasi penerimaan barang? Stok akan berpindah setelah ini.'))return;
-    S.deliveryOrders=S.deliveryOrders.map(x=>x.id===el.dataset.confirmdo?{...x,status:'confirmed',confirmedTgl:today()}:x);
-    save();S.modal=null;render();toast('DO dikonfirmasi — stok telah berpindah');
-  }));
+  document.querySelectorAll('[data-edo]').forEach(el=>el.addEventListener('click',()=>{const d=S.deliveryOrders.find(x=>x.id===el.dataset.edo);if(d){S.modal={type:'do',data:{...d}};render();bm();}}));
+  document.querySelectorAll('[data-senddo]').forEach(el=>el.addEventListener('click',()=>{if(!confirm('Kirim DO ini ke tujuan? Status akan berubah ke Dikirim.'))return;S.deliveryOrders=S.deliveryOrders.map(x=>x.id===el.dataset.senddo?{...x,status:'sent'}:x);save();render();toast('DO dikirim');}));
+  document.querySelectorAll('[data-confirmdo]').forEach(el=>el.addEventListener('click',()=>{if(!confirm('Konfirmasi terima barang? Stok akan bergerak ke lokasi tujuan.'))return;S.deliveryOrders=S.deliveryOrders.map(x=>x.id===el.dataset.confirmdo?{...x,status:'confirmed',confirmedTgl:today()}:x);save();render();toast('DO dikonfirmasi — stok telah bergerak');}));
+  document.querySelectorAll('[data-ddo]').forEach(el=>el.addEventListener('click',()=>{if(confirm('Hapus DO ini?')){S.deliveryOrders=S.deliveryOrders.filter(x=>x.id!==el.dataset.ddo);save();render();}}));
+
   document.querySelectorAll('[data-ekonv]').forEach(el=>el.addEventListener('click',()=>{const c=S.stockConversions.find(x=>x.id===el.dataset.ekonv);if(c){S.modal={type:'konversi',data:{...c}};render();bm();}}));
   document.querySelectorAll('[data-dkonv]').forEach(el=>el.addEventListener('click',()=>{
     if(confirm('Hapus konversi ini? Stok akan dikembalikan ke kondisi sebelum konversi.'))
@@ -2235,7 +2332,7 @@ function bind(){
       return{id:uid(),sku:i.sku,nama:i.nama,brand:(S.products.find(p=>p.sku===i.sku)||{}).brand||'',hargaListAsli:hl,disc:dc,hargaNetAsli:hn,hargaNetIDR:hn*po.rate,qty:i.qty,totalAsli:hn*i.qty,totalIDR:hn*i.qty*po.rate};
     });
     const isCredit=po.payTerm==='credit';
-    S.purchases.push({id:uid(),tgl:today(),inv:po.noPO,supId:po.supId,curr:po.curr,rate:po.rate,items,payTerm:isCredit?'credit':'cash',payments:[],payStatus:isCredit?'outstanding':'paid',fromPO:po.id});
+    S.purchases.push({id:uid(),tgl:today(),inv:po.noPO,supId:po.supId,curr:po.curr,rate:po.rate,locId:po.locId||'',items,payTerm:isCredit?'credit':'cash',payments:[],payStatus:isCredit?'outstanding':'paid',fromPO:po.id});
     S.purchaseOrders=S.purchaseOrders.map(x=>x.id===po.id?{...x,status:'received'}:x);
     save();render();toast(isCredit?'PO dikonversi — tercatat sebagai utang':'PO dikonversi — tercatat lunas');
   }));
@@ -2337,60 +2434,6 @@ function bm(){
     }
   });
 
-  // LOKASI
-  document.getElementById('bSvLoc')?.addEventListener('click',function(){
-    const id=this.dataset.id;
-    const nama=document.getElementById('fLocNama').value.trim();
-    const tipe=document.getElementById('fLocTipe').value;
-    const ket=document.getElementById('fLocKet').value;
-    if(!nama){alert('Nama lokasi wajib diisi');return;}
-    if(id){S.locations=S.locations.map(x=>x.id===id?{...x,nama,tipe,ket}:x);toast('Lokasi diperbarui');}
-    else{S.locations.push({id:uid(),nama,tipe,ket});toast('Lokasi ditambahkan');}
-    save();S.modal=null;render();
-  });
-
-  // DO SAVE
-  const collectDOItems=()=>[...document.querySelectorAll('#doItemList .doLine')].map(l=>({
-    sku:l.querySelector('.doSku')?.value||'',qty:parseFloat(l.querySelector('.doQty')?.value)||1
-  })).filter(x=>x.sku);
-  document.getElementById('bAddItemDO')?.addEventListener('click',()=>{
-    const list=document.getElementById('doItemList');if(!list)return;
-    const div=document.createElement('div');
-    div.innerHTML=`<div class="doLine" style="display:grid;grid-template-columns:1fr 130px 36px;gap:6px;align-items:center;padding:7px;background:#FAFBFC;border:1px solid var(--bd);border-radius:7px;margin-bottom:6px">
-      <select class="doSku"><option value="">— SKU —</option>${S.products.map(p=>`<option value="${p.sku}">${p.sku} — ${p.nama}</option>`).join('')}</select>
-      <input class="doQty" type="number" value="1" min="1">
-      <button class="btn btn-ic btn-sm btn-d doRem"><i class="ti ti-minus"></i></button></div>`;
-    list.appendChild(div.firstElementChild);
-    list.lastElementChild.querySelector('.doRem')?.addEventListener('click',e=>e.target.closest('.doLine').remove());
-  });
-  document.querySelectorAll('.doRem').forEach(btn=>btn.addEventListener('click',e=>e.target.closest('.doLine').remove()));
-  document.getElementById('bSvDO')?.addEventListener('click',function(){
-    const id=this.dataset.id;
-    const tgl=document.getElementById('fTg').value;
-    const noDO=document.getElementById('fNoDO').value;
-    const fromLocId=document.getElementById('fFromLoc').value;
-    const toLocId=document.getElementById('fToLoc').value;
-    const catatan=document.getElementById('fDoCat').value;
-    const items=collectDOItems();
-    if(!tgl||!fromLocId||!toLocId){alert('Tanggal, lokasi asal, dan lokasi tujuan wajib diisi');return;}
-    if(fromLocId===toLocId){alert('Lokasi asal dan tujuan tidak boleh sama');return;}
-    if(!items.length){alert('Tambahkan minimal 1 item SKU');return;}
-    // warn jika stok kurang
-    const kurang=items.filter(it=>{const s=statsLoc(it.sku,fromLocId);return s.stokBagus<it.qty;});
-    if(kurang.length&&!confirm('Stok tidak mencukupi untuk: '+kurang.map(x=>x.sku).join(', ')+'. Lanjutkan?'))return;
-    const rec={tgl,noDO,fromLocId,toLocId,catatan,items,status:'sent'};
-    if(id){S.deliveryOrders=S.deliveryOrders.map(x=>x.id===id?{...x,...rec}:x);toast('DO diperbarui');}
-    else{S.deliveryOrders.push({id:uid(),...rec});toast('DO dibuat — status: Dikirim');}
-    save();S.modal=null;render();
-  });
-  // confirm from viewDO modal
-  document.getElementById('bConfFromView')?.addEventListener('click',function(){
-    if(!confirm('Konfirmasi penerimaan barang?'))return;
-    const doId=this.dataset.confirmdo;
-    S.deliveryOrders=S.deliveryOrders.map(x=>x.id===doId?{...x,status:'confirmed',confirmedTgl:today()}:x);
-    save();S.modal=null;render();toast('DO dikonfirmasi');
-  });
-
   // PRODUK
   // handler upload foto + kompresi otomatis
   document.getElementById('fFoto')?.addEventListener('change',function(){
@@ -2425,17 +2468,16 @@ function bm(){
     const newSku=document.getElementById('fSk').value.trim().toUpperCase(),nama=document.getElementById('fNm').value.trim();
     const m=parseFloat(document.getElementById('fMd').value)||0,sb=parseFloat(document.getElementById('fSb').value)||0,sk=parseFloat(document.getElementById('fSk2').value)||0;
     const foto=document.getElementById('fFotoData')?.value||'';
-    // collect stok per lokasi
-    const stokAwal=S.locations.map(loc=>{
-      const sb=parseFloat(document.querySelector(`.fLocSb[data-locid="${loc.id}"]`)?.value)||0;
-      const sk=parseFloat(document.querySelector(`.fLocSk[data-locid="${loc.id}"]`)?.value)||0;
-      return{locId:loc.id,sbAwal:sb,skAwal:sk};
-    });
     if(!newSku||!nama){alert('SKU dan Nama wajib diisi');return;}
+    // collect stok awal per lokasi
+    const stokAwal=S.locations.map(loc=>{
+      const sbEl=document.querySelector(`.locSb[data-locid="${loc.id}"]`);
+      const skEl=document.querySelector(`.locSk[data-locid="${loc.id}"]`);
+      return{locId:loc.id,sbAwal:parseFloat(sbEl?.value)||0,skAwal:parseFloat(skEl?.value)||0};
+    });
     if(id){
       const oldProd=S.products.find(p=>p.id===id);
       const oldSku=oldProd?.sku||'';
-      // cek duplikat SKU baru (bukan diri sendiri)
       if(newSku!==oldSku&&S.products.find(p=>p.sku===newSku)){alert('SKU '+newSku+' sudah dipakai produk lain!');return;}
       S.products=S.products.map(p=>p.id===id?{...p,brand:br,sku:newSku,nama,m,sb,sk,foto,stokAwal}:p);
       // CASCADE: update SKU lama ke baru di semua data
@@ -2483,12 +2525,13 @@ function bm(){
     const tgl=document.getElementById('fTg').value,inv=document.getElementById('fIn').value;
     const supId=document.getElementById('fSup').value;
     const curr=document.getElementById('fCurr').value,rate=parseFloat(document.getElementById('fRate').value)||1;
+    const locId=document.getElementById('fLocBuy')?.value||'';
     const items=collectBuy().map(i=>({...i,hargaNetIDR:i.hargaNetAsli*rate,totalIDR:i.totalAsli*rate}));
     if(!tgl){alert('Tanggal wajib diisi');return;}
     if(!items.length||items.some(i=>!i.sku)){alert('Lengkapi semua item SKU');return;}
     if(id){const old=S.purchases.find(x=>x.id===id);
-      S.purchases=S.purchases.map(x=>x.id===id?{...x,tgl,inv,supId,curr,rate,items}:x);toast('Pembelian diperbarui');}
-    else{S.purchases.push({id:uid(),tgl,inv,supId,curr,rate,items,payTerm:'cash',payments:[],payStatus:'outstanding'});toast('Pembelian dicatat');}
+      S.purchases=S.purchases.map(x=>x.id===id?{...x,tgl,inv,supId,curr,rate,locId,items}:x);toast('Pembelian diperbarui');}
+    else{S.purchases.push({id:uid(),tgl,inv,supId,curr,rate,locId,items,payTerm:'cash',payments:[],payStatus:'outstanding'});toast('Pembelian dicatat');}
     save();S.modal=null;render();
   });
 
@@ -2511,25 +2554,28 @@ function bm(){
     const custId=document.getElementById('fCust').value,ch=document.getElementById('fCh').value;
     const fee=parseFloat(document.getElementById('fFee').value)||0;
     const ongkir=parseFloat(document.getElementById('fOngkir').value)||0;
+    const locId=document.getElementById('fLocSell')?.value||'';
     const payTerm=document.getElementById('fPt').value;
     const termDays=parseInt(document.getElementById('fTermDays')?.value||0);
     const jatuhTempo=document.getElementById('fJt')?.value||'';
     const ppnOn=document.getElementById('fPpnOn').value==='yes';
     const ppnPct=parseFloat(document.getElementById('fPpnPct').value)||11;
-    const locId=document.getElementById('fSellLoc')?.value||'';
     const items=collectSell();
     if(!tgl){alert('Tanggal wajib diisi');return;}
     if(!items.length||items.some(i=>!i.sku)){alert('Lengkapi semua item SKU');return;}
     const initPayStatus=(payTerm==='cash')?'paid':'outstanding';
     if(id){
-      S.sales=S.sales.map(x=>x.id===id?{...x,tgl,inv,custId,ch,fee,ongkir,payTerm,termDays,jatuhTempo,ppnOn,ppnPct,items,locId}:x);toast('Penjualan diperbarui');}
-    else{S.sales.push({id:uid(),tgl,inv,custId,ch,fee,ongkir,payTerm,termDays,jatuhTempo,ppnOn,ppnPct,items,locId,payStatus:initPayStatus,payments:[],danaStatus:ch==='Online'?'tertahan':'cair'});toast('Penjualan dicatat');}
+      S.sales=S.sales.map(x=>x.id===id?{...x,tgl,inv,custId,ch,fee,ongkir,locId,payTerm,termDays,jatuhTempo,ppnOn,ppnPct,items}:x);toast('Penjualan diperbarui');}
+    else{S.sales.push({id:uid(),tgl,inv,custId,ch,fee,ongkir,payTerm,termDays,jatuhTempo,ppnOn,ppnPct,items,payStatus:initPayStatus,payments:[],danaStatus:ch==='Online'?'tertahan':'cair'});toast('Penjualan dicatat');}
     save();S.modal=null;render();
   });
 
   // edit & delete cicilan
   document.querySelectorAll('[data-editpay]').forEach(el=>el.addEventListener('click',()=>{
     S.modal={type:'editPaySell',data:{saleId:el.dataset.saleid,payId:el.dataset.editpay}};render();bm();
+  }));
+  document.querySelectorAll('[data-viewbuy]').forEach(el=>el.addEventListener('click',()=>{
+    S.modal={type:'viewBuy',data:{id:el.dataset.viewbuy}};render();bm();
   }));
   document.querySelectorAll('[data-viewpo]').forEach(el=>el.addEventListener('click',()=>{
     S.modal={type:'viewPO',data:{id:el.dataset.viewpo}};render();bm();
@@ -2653,6 +2699,66 @@ function bm(){
     if(id){S.expenses=S.expenses.map(x=>x.id===id?{...x,...rec}:x);toast('Biaya diperbarui');}
     else{S.expenses.push({id:uid(),...rec});toast('Biaya dicatat');}
     save();S.modal=null;render();
+  });
+
+  // LOKASI
+  document.getElementById('bSvLoc')?.addEventListener('click',function(){
+    const id=this.dataset.id,nama=document.getElementById('fNm').value.trim();
+    const tipe=document.getElementById('fTipeLoc').value;
+    const catatan=document.getElementById('fCatatan').value.trim();
+    if(!nama){alert('Nama lokasi wajib diisi');return;}
+    if(id){S.locations=S.locations.map(l=>l.id===id?{...l,nama,tipe,catatan}:l);toast('Lokasi diperbarui');}
+    else{S.locations.push({id:uid(),nama,tipe,catatan});toast('Lokasi ditambahkan');}
+    save();S.modal=null;render();
+  });
+
+  // DO
+  const collectDOItems=()=>{
+    return[...document.querySelectorAll('#doItemList .doItemLine')].map(line=>{
+      const sku=line.querySelector('.doSku')?.value||'';
+      const qty=parseFloat(line.querySelector('.doQty')?.value)||1;
+      const p=S.products.find(x=>x.sku===sku);
+      return{sku,nama:p?.nama||'',qty};
+    }).filter(x=>x.sku);
+  };
+  document.getElementById('bAddItemDO')?.addEventListener('click',()=>{
+    const list=document.getElementById('doItemList');if(!list)return;
+    const div=document.createElement('div');
+    div.className='doItemLine';div.style.cssText='display:grid;grid-template-columns:2fr 120px 36px;gap:6px;margin-bottom:6px;align-items:center';
+    div.innerHTML=`<select class="doSku" style="padding:8px;border:1px solid var(--bd);border-radius:7px;font-family:inherit;font-size:12px"><option value="">— Pilih SKU —</option>${S.products.map(p=>`<option value="${p.sku}">${p.sku} — ${p.nama}</option>`).join('')}</select><input class="doQty" type="number" value="1" min="1" style="padding:8px;border:1px solid var(--bd);border-radius:7px;text-align:center"><button class="btn btn-ic btn-sm btn-d doRemLine"><i class="ti ti-minus"></i></button>`;
+    list.appendChild(div);
+    div.querySelector('.doRemLine')?.addEventListener('click',()=>div.remove());
+  });
+  document.querySelectorAll('.doRemLine').forEach(btn=>btn.addEventListener('click',()=>btn.closest('.doItemLine')?.remove()));
+  document.getElementById('bSvDO')?.addEventListener('click',function(){
+    const id=this.dataset.id;
+    const tgl=document.getElementById('fTg').value;
+    const noDO=document.getElementById('fNoDO').value.trim();
+    const catatan=document.getElementById('fCatatan').value.trim();
+    const fromLocId=document.getElementById('fFromLoc').value;
+    const toLocId=document.getElementById('fToLoc').value;
+    const items=collectDOItems();
+    if(!tgl){alert('Tanggal wajib diisi');return;}
+    if(!fromLocId||!toLocId){alert('Pilih lokasi asal dan tujuan');return;}
+    if(fromLocId===toLocId){alert('Lokasi asal dan tujuan tidak boleh sama');return;}
+    if(!items.length){alert('Tambahkan minimal 1 item');return;}
+    // validasi stok mencukupi di lokasi asal
+    const kurang=items.filter(it=>{const s=stats(it.sku,fromLocId);return s.stokBagus<it.qty;});
+    if(kurang.length){
+      const warn=kurang.map(it=>{const s=stats(it.sku,fromLocId);const fromL=S.locations.find(l=>l.id===fromLocId);return`${it.sku} (stok di ${fromL?fromL.nama:'sumber'}: ${fmt(s.stokBagus)}, DO: ${fmt(it.qty)})`;}).join(', ');
+      if(!confirm('Stok tidak mencukupi di lokasi asal untuk: '+warn+'\n\nBuat DO tetap?'))return;
+    }
+    const rec={tgl,noDO,catatan,fromLocId,toLocId,items,status:'draft'};
+    if(id){S.deliveryOrders=S.deliveryOrders.map(x=>x.id===id?{...x,...rec}:x);toast('DO diperbarui');}
+    else{S.deliveryOrders.push({id:uid(),...rec});toast('DO berhasil dibuat');}
+    save();S.modal=null;render();
+  });
+  // confirm DO from viewDO modal
+  document.getElementById('bConfFromView')?.addEventListener('click',function(){
+    const doId=this.dataset.confirmdo;
+    if(!confirm('Konfirmasi terima barang? Stok akan bergerak ke lokasi tujuan.'))return;
+    S.deliveryOrders=S.deliveryOrders.map(x=>x.id===doId?{...x,status:'confirmed',confirmedTgl:today()}:x);
+    save();S.modal=null;render();toast('DO dikonfirmasi — stok telah bergerak');
   });
 
   // KONVERSI STOK
