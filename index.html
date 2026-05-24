@@ -420,7 +420,7 @@ function pgDash(){
       const cust=S.customers.find(c=>c.id===x.custId);
       const paid=(x.payments||[]).reduce((a,p)=>a+(p.amountIDR||p.amount),0);
       const st=paid>=saleNeto(x)?'paid':paid>0?'partial':'outstanding';
-      return`<tr><td class="nw">${fd(x.tgl)}</td><td><span class="chip">${x.inv||'—'}</span></td>
+      return`<tr><td class="nw">${fd(x.tgl)}</td><td><span class="chip" data-viewsale="${x.id}" style="cursor:pointer;color:var(--acc)">${x.inv||'—'} <i class="ti ti-external-link" style="font-size:9px"></i></span></td>
         <td>${cust?cust.nama:'—'}</td><td class="rt">${rp(saleNeto(x))}</td>
         <td><span class="pay-badge ${st}">${st==='paid'?'Lunas':st==='partial'?'Sebagian':'Belum'}</span></td></tr>`;
     }).join('')}</tbody></table>`}
@@ -430,7 +430,7 @@ function pgDash(){
     <table><thead><tr><th>Tgl</th><th>Invoice</th><th>Supplier</th><th class="rt">Total (IDR)</th></tr></thead><tbody>
     ${[...S.purchases].reverse().slice(0,7).map(x=>{
       const sup=S.suppliers.find(s=>s.id===x.supId);
-      return`<tr><td class="nw">${fd(x.tgl)}</td><td><span class="chip">${x.inv||'—'}</span></td>
+      return`<tr><td class="nw">${fd(x.tgl)}</td><td><span class="chip" data-viewbuy="${x.id}" style="cursor:pointer;color:var(--acc)">${x.inv||'—'} <i class="ti ti-external-link" style="font-size:9px"></i></span></td>
         <td>${sup?sup.nama:'—'}</td><td class="rt">${rp(purchaseTotalIDR(x))}</td></tr>`;
     }).join('')}</tbody></table>`}
     </div>
@@ -1611,19 +1611,19 @@ function modal(){
       const el=S.expenses.filter(x=>x.payStatus==='belum');
       const allRows=[
         ...pl.map(x=>{const s=S.suppliers.find(ss=>ss.id===x.supId);const paid=(x.payments||[]).reduce((a,p)=>a+(p.amountIDR||p.amount),0);const tIDR=purchaseTotalIDR(x);const sisa=tIDR-paid;total+=sisa;
-          return`<tr><td class="nw">${fd(x.tgl)}</td><td><span class="chip">${x.inv||'—'}</span></td><td>${s?s.nama:'—'}</td><td class="rt">${rp(tIDR)}</td><td class="rt g">${rp(paid)}</td><td class="rt r"><strong>${rp(sisa)}</strong></td></tr>`;}),
+          return`<tr><td class="nw">${fd(x.tgl)}</td><td><span class="chip" data-viewbuy="${x.id}" style="cursor:pointer;color:var(--acc)">${x.inv||'—'} <i class="ti ti-external-link" style="font-size:9px"></i></span></td><td>${s?s.nama:'—'}</td><td class="rt">${rp(tIDR)}</td><td class="rt g">${rp(paid)}</td><td class="rt r"><strong>${rp(sisa)}</strong></td></tr>`;}),
         ...el.map(x=>{const s=S.suppliers.find(ss=>ss.id===x.supId);total+=x.jumlah;
           return`<tr><td class="nw">${fd(x.tgl)}</td><td>${x.invNo?`<span class="chip">${x.invNo}</span>`:'Biaya'}</td><td>${s?s.nama:'—'}</td><td class="rt">${rp(x.jumlah)}</td><td class="rt">—</td><td class="rt r"><strong>${rp(x.jumlah)}</strong></td></tr>`;}),
       ];
       rows=allRows.join('')||`<tr><td colspan="6"><div class="empty" style="padding:20px"><p>Tidak ada hutang</p></div></td></tr>`;
     }else if(key==='stok'){
-      judul='Rincian Nilai Stok per Brand';
+      judul='Rincian Nilai Stok per Brand — Klik brand untuk lihat detail';
       headCols='<th>Brand</th><th class="rt">SKU</th><th class="rt">Stok Bagus</th><th class="rt">Avg Modal</th><th class="rt">Nilai Stok</th>';
       const bRows=BRANDS.map(b=>{const ps=S.products.filter(p=>p.brand===b);if(!ps.length)return'';
         const ni=ps.reduce((a,p)=>{const s=stats(p.sku);return a+s.stokBagus*s.avg;},0);
         const bg=ps.reduce((a,p)=>a+stats(p.sku).stokBagus,0);total+=ni;
         if(!ni&&!bg)return'';
-        return`<tr><td><span class="bdg bb">${b}</span></td><td class="rt">${ps.length}</td><td class="rt ${bg<0?'r':'g'}">${fmt(bg)}</td><td class="rt o">${rp(ps.reduce((a,p)=>a+stats(p.sku).avg,0)/ps.length)}</td><td class="rt">${rp(ni)}</td></tr>`;
+        return`<tr style="cursor:pointer" data-navbrand="${b}" title="Klik untuk lihat stok ${b}"><td><span class="bdg bb" style="cursor:pointer">${b} <i class="ti ti-external-link" style="font-size:9px"></i></span></td><td class="rt">${ps.length}</td><td class="rt ${bg<0?'r':'g'}">${fmt(bg)}</td><td class="rt o">${rp(ps.reduce((a,p)=>a+stats(p.sku).avg,0)/ps.length)}</td><td class="rt">${rp(ni)}</td></tr>`;
       });
       rows=bRows.join('')||`<tr><td colspan="5"><div class="empty" style="padding:20px"><p>Belum ada produk</p></div></td></tr>`;
     }else if(key==='tertahan'){
@@ -2209,12 +2209,17 @@ function skuLineSell(it,idx){
       <input class="slTot" type="number" value="${it.total||0}" readonly style="background:#f5f6fa">
       <button class="btn btn-ic btn-sm btn-d slRem"><i class="ti ti-minus"></i></button>
     </div>
-    <div class="slSetRow" style="${isSet?'':'display:none;'}display:grid;grid-template-columns:1fr 1fr 90px 110px 36px;gap:6px;align-items:center">
-      <select class="slSetTpl"><option value="">— Template Set —</option>${setTplOpts}</select>
-      <select class="slSetSize"><option value="">— Ukuran —</option>${sizeOpts}</select>
-      <input class="slSetQty" type="number" value="${it.setQty||1}" placeholder="Qty set" min="1" title="Berapa set?">
-      <input class="slSetHarga" type="number" value="${it.setHarga||0}" placeholder="Harga/set">
-      <button class="btn btn-ic btn-sm btn-d slRem"><i class="ti ti-minus"></i></button>
+    <div class="slSetRow" style="${isSet?'':'display:none;'}">
+      <div style="display:grid;grid-template-columns:1fr 1fr 90px 110px 36px;gap:6px;align-items:center;margin-bottom:6px">
+        <select class="slSetTpl"><option value="">— Template Set —</option>${setTplOpts}</select>
+        <select class="slSetSize"><option value="">— Ukuran —</option>${sizeOpts}</select>
+        <input class="slSetQty" type="number" value="${it.setQty||1}" placeholder="Qty set" min="1" title="Berapa set?">
+        <input class="slSetHarga" type="number" value="${it.setHarga||0}" placeholder="Harga/set (Rp)">
+        <button class="btn btn-ic btn-sm btn-d slRem"><i class="ti ti-minus"></i></button>
+      </div>
+      <div class="slSetKomposisi" style="display:none;background:#fff;border:1px solid var(--bd);border-radius:7px;padding:10px;margin-top:4px">
+        <div style="font-size:11px;font-weight:700;color:var(--t2);margin-bottom:8px">PILIH SKU PER KOMPONEN <span style="font-weight:400">(difilter berdasarkan tipe + ukuran)</span></div>
+      </div>
     </div>
     <div class="slSetInfo" style="font-size:11px;color:var(--t2);margin-top:4px;padding:0 2px"></div>
   </div>`;
@@ -2278,9 +2283,11 @@ function collectSell(){
       const tpl=SET_TYPES.find(t=>t.kode===tplKode);
       if(!tpl)return;
       const hargaPerPcs=hargaSet/4; // 1 set = 4 pcs
-      tpl.komposisi.forEach(k=>{
-        const found=findSKUForSet(k.tipe,sizeKode);
-        if(!found.length)return;
+      const kompSels=[...l.querySelectorAll('.kompSkuSel')];
+      tpl.komposisi.forEach((k,ki)=>{
+        const selSkuVal=kompSels[ki]?.value||'';
+        const found=selSkuVal?[S.products.find(x=>x.sku===selSkuVal)].filter(Boolean):findSKUForSet(k.tipe,sizeKode);
+        if(!found.length||!found[0])return;
         const p=found[0];
         const qtyPcs=k.qty*qtySet;
         const s=stats(p.sku);
@@ -2648,9 +2655,12 @@ function bind(){
     else{S.sortBy=el.dataset.sort;S.sortDir='asc';}render();
   }));
   // view invoice
-  document.querySelectorAll('[data-viewsale]').forEach(el=>el.addEventListener('click',()=>{
-    S.modal={type:'viewSale',data:{id:el.dataset.viewsale}};render();bm();
-  }));
+  document.querySelectorAll('[data-viewsale]').forEach(el=>{
+    const neo=el.cloneNode(true);el.parentNode?.replaceChild(neo,el);
+    neo.addEventListener('click',e=>{e.stopPropagation();
+      S.modal={type:'viewSale',data:{id:neo.dataset.viewsale}};render();bm();
+    });
+  });
   document.getElementById('sFp')?.addEventListener('change',e=>{S.fp=e.target.value;render();});
   document.getElementById('sFy')?.addEventListener('change',e=>{S.fy=parseInt(e.target.value);render();});
   document.getElementById('sFm')?.addEventListener('change',e=>{S.fm=parseInt(e.target.value);render();});
@@ -2686,6 +2696,11 @@ function bind(){
     {S.stockConversions=S.stockConversions.filter(x=>x.id!==el.dataset.dkonv);save();render();}
   }));
   document.getElementById('bExpLR')?.addEventListener('click',exportLRxls);
+  document.querySelectorAll('[data-navbrand]').forEach(el=>el.addEventListener('click',e=>{
+    e.stopPropagation();
+    const brand=el.dataset.navbrand;
+    S.modal=null;S.page='rekap';S.fb=brand;S.q='';render();
+  }));
   document.querySelectorAll('[data-dash]').forEach(el=>el.addEventListener('click',()=>{
     S.modal={type:'dashDetail',data:{key:el.dataset.dash}};render();bm();
   }));
@@ -2958,9 +2973,13 @@ function bm(){
   document.querySelectorAll('[data-editpay]').forEach(el=>el.addEventListener('click',()=>{
     S.modal={type:'editPaySell',data:{saleId:el.dataset.saleid,payId:el.dataset.editpay}};render();bm();
   }));
-  document.querySelectorAll('[data-viewbuy]').forEach(el=>el.addEventListener('click',()=>{
-    S.modal={type:'viewBuy',data:{id:el.dataset.viewbuy}};render();bm();
-  }));
+  document.querySelectorAll('[data-viewbuy]').forEach(el=>{
+    // remove old listeners by cloning
+    const neo=el.cloneNode(true);el.parentNode?.replaceChild(neo,el);
+    neo.addEventListener('click',e=>{e.stopPropagation();
+      S.modal={type:'viewBuy',data:{id:neo.dataset.viewbuy}};render();bm();
+    });
+  });
   document.querySelectorAll('[data-viewpo]').forEach(el=>el.addEventListener('click',()=>{
     S.modal={type:'viewPO',data:{id:el.dataset.viewpo}};render();bm();
   }));
@@ -3361,24 +3380,51 @@ function bindSellLine(l){
   const normalRow=l.querySelector('.slNormalRow');
   const setRow=l.querySelector('.slSetRow');
   const setInfo=l.querySelector('.slSetInfo');
-  const updateSetInfo=()=>{
-    if(!isSetCb?.checked)return;
+  const _buildKomposisi=()=>{
+    const komp=l.querySelector('.slSetKomposisi');if(!komp)return;
     const tplKode=l.querySelector('.slSetTpl')?.value||'';
     const sizeKode=l.querySelector('.slSetSize')?.value||'';
     const qtySet=parseFloat(l.querySelector('.slSetQty')?.value)||1;
-    const hargaSet=parseFloat(l.querySelector('.slSetHarga')?.value)||0;
-    if(!tplKode||!sizeKode){if(setInfo)setInfo.innerHTML='Pilih template dan ukuran';return;}
+    if(!tplKode||!sizeKode){komp.style.display='none';if(setInfo)setInfo.innerHTML='Pilih template dan ukuran dulu';return;}
     const tpl=SET_TYPES.find(t=>t.kode===tplKode);
-    if(!tpl){if(setInfo)setInfo.innerHTML='';return;}
-    const lines=tpl.komposisi.map(k=>{
+    if(!tpl){komp.style.display='none';return;}
+    komp.style.display='block';
+    // build picker per komponen
+    const rows=tpl.komposisi.map((k,ki)=>{
       const found=findSKUForSet(k.tipe,sizeKode);
       const qtyPcs=k.qty*qtySet;
-      if(!found.length)return`<span style="color:var(--err)">✗ ${BRACKET_NAMES[k.tipe]} ${qtyPcs}pcs — SKU tidak ditemukan</span>`;
-      const p=found[0];const s=stats(p.sku);
-      const clr=s.stokBagus<qtyPcs?'var(--err)':'var(--ok)';
-      return`<span style="color:${clr}">✓ ${p.sku} ×${qtyPcs}pcs (stok:${fmt(s.stokBagus)})</span>`;
+      const selId='kompSku_'+ki+'_'+idx;
+      const curVal=komp.querySelectorAll('.kompSkuSel')[ki]?.value||'';
+      const opts=found.map(p=>{
+        const s=stats(p.sku);
+        const clr=s.stokBagus<qtyPcs?'color:var(--err)':'';
+        return`<option value="${p.sku}" style="${clr}" ${(curVal||found[0]?.sku)===p.sku?'selected':''}>${p.sku} — ${p.nama} (stok: ${fmt(s.stokBagus)})</option>`;
+      }).join('');
+      if(!found.length)return`<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span class="bdg bo">${BRACKET_NAMES[k.tipe]} ×${qtyPcs}pcs</span><span style="color:var(--err);font-size:11px">✗ SKU tidak ditemukan — tambah produk dengan suffix -${k.tipe} dan kode ${sizeKode}</span></div>`;
+      return`<div style="display:grid;grid-template-columns:160px 1fr 80px;gap:8px;align-items:center;margin-bottom:6px">
+        <div><span class="bdg ${k.tipe==='SB'?'bo':k.tipe==='F'?'bx':'bb'}">${BRACKET_NAMES[k.tipe]}</span><span class="tm" style="font-size:10px;margin-left:4px">×${qtyPcs}pcs</span></div>
+        <select class="kompSkuSel" data-ki="${ki}">${opts}</select>
+        <span id="${selId}Stok" style="font-size:11px"></span>
+      </div>`;
     });
-    if(setInfo)setInfo.innerHTML=lines.join('  &nbsp;|&nbsp;  ');
+    komp.innerHTML='<div style="font-size:11px;font-weight:700;color:var(--t2);margin-bottom:8px">PILIH SKU PER KOMPONEN <span style="font-weight:400">(difilter: '+BRACKET_NAMES[tpl.komposisi[0]?.tipe]+' + ukuran '+SIZE_MAP[sizeKode]+' — pilih bahan roda)</span></div>'+rows.join('');
+    // wire stok update per komponen select
+    komp.querySelectorAll('.kompSkuSel').forEach(sel=>{
+      const ki=parseInt(sel.dataset.ki);const k=tpl.komposisi[ki];
+      const _upd=()=>{
+        const sku=sel.value;if(!sku)return;
+        const qtyPcs=k.qty*qtySet;const s=stats(sku);
+        const clr=s.stokBagus<qtyPcs?'var(--err)':'var(--ok)';
+        const stokEl=sel.parentElement?.querySelector('[id$="Stok"]');
+        if(stokEl)stokEl.innerHTML=`<span style="color:${clr}">stok:${fmt(s.stokBagus)}</span>`;
+        updateSellSummary();
+      };
+      sel.addEventListener('change',_upd);setTimeout(_upd,10);
+    });
+  };
+  const updateSetInfo=()=>{
+    if(!isSetCb?.checked)return;
+    _buildKomposisi();
     updateSellSummary();
   };
   isSetCb?.addEventListener('change',()=>{
