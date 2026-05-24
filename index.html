@@ -81,6 +81,60 @@ label{font-size:11px;color:var(--t2);margin-bottom:4px;display:block;font-weight
 <body><div id="app"></div>
 <script>
 // ═══ CONSTANTS ═══
+// ─── SET KASTOR CONSTANTS ─────────────────────────────────────────────────────
+const SET_TYPES=[
+  {kode:'H/H', nama:'Set H/H (4x Swivel)',   komposisi:[{tipe:'S',qty:4}]},
+  {kode:'M/M', nama:'Set M/M (4x Fixed)',    komposisi:[{tipe:'F',qty:4}]},
+  {kode:'R/R', nama:'Set R/R (4x Rem)',      komposisi:[{tipe:'SB',qty:4}]},
+  {kode:'H/M', nama:'Set H/M (2x Swivel + 2x Fixed)', komposisi:[{tipe:'S',qty:2},{tipe:'F',qty:2}]},
+  {kode:'R/H', nama:'Set R/H (2x Rem + 2x Swivel)',   komposisi:[{tipe:'SB',qty:2},{tipe:'S',qty:2}]},
+  {kode:'R/M', nama:'Set R/M (2x Rem + 2x Fixed)',    komposisi:[{tipe:'SB',qty:2},{tipe:'F',qty:2}]},
+  {kode:'WO',  nama:'Set WO (4x Wheel Only)',komposisi:[{tipe:'WO',qty:4}]},
+];
+const SIZE_MAP={
+  '025':'1"','040':'1½"','050':'2"','075':'3"',
+  '100':'4"','125':'5"','150':'6"','200':'8"','250':'10"'
+};
+const BRACKET_TYPES=['S','F','SB','WO']; // Swivel, Fixed, Swivel Brake, Wheel Only
+const BRACKET_NAMES={'S':'Swivel (Hidup)','F':'Fixed (Mati)','SB':'Swivel Brake (Rem)','WO':'Wheel Only'};
+// parse tipe dari suffix SKU: 036-075-S -> 'S', 037-075-F -> 'F', dll
+function parseSKUTipe(sku){
+  if(!sku)return null;
+  const parts=sku.split('-');
+  const last=parts[parts.length-1].toUpperCase();
+  if(['S','SW'].includes(last))return'S';
+  if(['F','FX'].includes(last))return'F';
+  if(['SB'].includes(last))return'SB';
+  if(['WO'].includes(last))return'WO';
+  return null;
+}
+// parse ukuran dari bagian tengah SKU: 036-075-S -> '075' -> '3"'
+function parseSKUSize(sku){
+  if(!sku)return null;
+  const parts=sku.split('-');
+  for(const p of parts){
+    if(SIZE_MAP[p])return{kode:p,label:SIZE_MAP[p]};
+  }
+  return null;
+}
+// cari SKU yang cocok untuk tipe + kode ukuran tertentu
+function findSKUForSet(tipe, sizeKode){
+  return S.products.filter(p=>{
+    const t=parseSKUTipe(p.sku);
+    const s=parseSKUSize(p.sku);
+    return t===tipe && s && s.kode===sizeKode;
+  });
+}
+// hitung semua ukuran yang tersedia di produk
+function availableSizes(){
+  const sizes={};
+  S.products.forEach(p=>{
+    const s=parseSKUSize(p.sku);
+    if(s)sizes[s.kode]=s.label;
+  });
+  return Object.entries(sizes).sort((a,b)=>parseInt(a[0])-parseInt(b[0]));
+}
+
 const BRANDS=['Sellery','Ranger Germany','Castrix','Blickle','Prohex','Crossman','King Tony','Elora','Truecraft','Force','Jason','Kondo','KTC','Matsu','Tekiro','Kukko','Toyoda','Zeki','ETC'];
 const CURRENCIES=['IDR','RMB','USD'];
 const PAY_METHODS=['Cash','Transfer Bank','QRIS','EDC'];
@@ -101,8 +155,8 @@ let S={
   products:[],purchases:[],sales:[],
   suppliers:[],customers:[],expenses:[],returns:[],purchaseOrders:[],
   stockConversions:[],
-  locations:[],deliveryOrders:[],
-  filterLoc:'',
+  locations:[],deliveryOrders:[],setTemplates:[],
+  filterLoc:'',setMode:false,settingsTab:'lokasi',
   fb:'',fp:'monthly',fy:new Date().getFullYear(),fm:new Date().getMonth(),q:'',
   sortBy:'brand',sortDir:'asc',
   txSort:'tgl',txDir:'desc',txMonth:-1,txYear:new Date().getFullYear(),
@@ -111,7 +165,7 @@ let S={
 
 function load(){
   try{const d=localStorage.getItem(KEY);if(d){const p=JSON.parse(d);
-    ['products','purchases','sales','suppliers','customers','expenses','returns','purchaseOrders','stockConversions','locations','deliveryOrders'].forEach(k=>{if(p[k])S[k]=p[k];});
+    ['products','purchases','sales','suppliers','customers','expenses','returns','purchaseOrders','stockConversions','locations','deliveryOrders','setTemplates'].forEach(k=>{if(p[k])S[k]=p[k];});
   }}catch(e){}
   // migrasi dari v2 lama jika ada
   try{const old=localStorage.getItem('hwtools-v2');if(old&&!S.products.length){const p=JSON.parse(old);
@@ -125,7 +179,7 @@ function load(){
   }}catch(e){}
 }
 function save(){
-  try{localStorage.setItem(KEY,JSON.stringify({products:S.products,purchases:S.purchases,sales:S.sales,suppliers:S.suppliers,customers:S.customers,expenses:S.expenses,returns:S.returns,purchaseOrders:S.purchaseOrders,stockConversions:S.stockConversions,locations:S.locations,deliveryOrders:S.deliveryOrders}));}catch(e){}
+  try{localStorage.setItem(KEY,JSON.stringify({products:S.products,purchases:S.purchases,sales:S.sales,suppliers:S.suppliers,customers:S.customers,expenses:S.expenses,returns:S.returns,purchaseOrders:S.purchaseOrders,stockConversions:S.stockConversions,locations:S.locations,deliveryOrders:S.deliveryOrders,setTemplates:S.setTemplates}));}catch(e){}
 }
 // ─── TRANSACTION FILTER HELPERS ───────────────────────────────────
 function txFilterBar(placeholder){
@@ -288,13 +342,13 @@ function layout(){
     produk:`<button class="btn" id="bImpProd"><i class="ti ti-file-import"></i> Import SKU</button><button class="btn btn-p" id="bAddP"><i class="ti ti-plus"></i> Tambah Produk</button>`,
     po:`<button class="btn btn-p" id="bAddPO"><i class="ti ti-plus"></i> Buat PO</button>`,
     pembelian:`<button class="btn btn-p" id="bAddBuy"><i class="ti ti-plus"></i> Catat Pembelian</button>`,
-    penjualan:`<button class="btn" id="bImpSell"><i class="ti ti-file-import"></i> Import Penjualan</button><button class="btn btn-p" id="bAddSell"><i class="ti ti-plus"></i> Catat Penjualan</button>`,
+    penjualan:`<button class="btn btn-ok" id="bAddSet"><i class="ti ti-package"></i> Jual Set Kastor</button><button class="btn" id="bImpSell"><i class="ti ti-file-import"></i> Import Penjualan</button><button class="btn btn-p" id="bAddSell"><i class="ti ti-plus"></i> Catat Penjualan</button>`,
     supplier:`<button class="btn btn-p" id="bAddSup"><i class="ti ti-plus"></i> Tambah Supplier</button>`,
     customer:`<button class="btn btn-p" id="bAddCust"><i class="ti ti-plus"></i> Tambah Customer</button>`,
     biaya:`<button class="btn btn-p" id="bAddExp"><i class="ti ti-plus"></i> Catat Biaya</button>`,
     konversi:`<button class="btn btn-p" id="bAddKonv"><i class="ti ti-plus"></i> Konversi Baru</button>`,
     do:`<button class="btn btn-p" id="bAddDO"><i class="ti ti-plus"></i> Buat DO</button>`,
-    settings:`<button class="btn btn-p" id="bAddLoc"><i class="ti ti-plus"></i> Tambah Lokasi</button>`,
+    settings:`${(S.settingsTab||'lokasi')==='lokasi'?'<button class="btn btn-p" id="bAddLoc"><i class="ti ti-plus"></i> Tambah Lokasi</button>':''}`,
   };
   return`<div class="layout">
   <div class="sidebar">
@@ -664,6 +718,7 @@ function pgBuy(){
       <td class="rt"><strong>${rp(totalIDR)}</strong></td>
       <td><span class="pay-badge ${st}">${st==='paid'?'Lunas':st==='partial'?'Sebagian':'Belum'}</span></td>
       <td style="white-space:nowrap">
+        <button class="btn btn-ic btn-sm bb" data-viewbuy="${x.id}" title="Lihat Detail"><i class="ti ti-eye"></i></button>
         <button class="btn btn-ic btn-sm" data-ebuy="${x.id}" title="Edit"><i class="ti ti-edit"></i></button>
         <button class="btn btn-ic btn-sm btn-ok" data-paybuy="${x.id}" title="Bayar"><i class="ti ti-cash"></i></button>
         <button class="btn btn-ic btn-sm btn-d" data-dbuy="${x.id}"><i class="ti ti-trash"></i></button>
@@ -824,11 +879,18 @@ function pgRetur(){
 
 // ═══ SETTINGS LOKASI ═══
 function pgSettings(){
+  const tab=S.settingsTab||'lokasi';
+  const tabBar=`<div class="tabs" style="margin-bottom:16px">
+    <div class="tab ${tab==='lokasi'?'active':''}" data-stab="lokasi">Lokasi & Gudang</div>
+    <div class="tab ${tab==='set'?'active':''}" data-stab="set">Template Set Kastor</div>
+  </div>`;
+  if(tab==='set')return tabBar+pgSettingsSet();
+  // lokasi tab
   const sortedLocs=[...S.locations].sort((a,b)=>a.nama.localeCompare(b.nama));
-  return`
+  return tabBar+`
   <div class="fb"><input id="iQ" placeholder="Cari nama lokasi..." value="${S.q}"></div>
   <div class="tw"><table><thead><tr><th>Nama Lokasi</th><th>Tipe</th><th>Catatan</th><th class="rt">Total SKU</th><th class="rt">Nilai Stok</th><th></th></tr></thead><tbody>
-  ${!S.locations.length?`<tr><td colspan="6"><div class="empty"><i class="ti ti-map-pin-off"></i><p>Belum ada lokasi. Tambahkan lokasi gudang atau toko kamu.</p></div></td></tr>`:
+  ${!sortedLocs.length?`<tr><td colspan="6"><div class="empty"><i class="ti ti-map-pin-off"></i><p>Belum ada lokasi.</p></div></td></tr>`:
   sortedLocs.filter(loc=>!S.q||loc.nama.toLowerCase().includes(S.q.toLowerCase())).map(loc=>{
     const totalNilai=S.products.reduce((a,p)=>{const s=stats(p.sku,loc.id);return a+s.stokBagus*s.avg;},0);
     const skuAda=S.products.filter(p=>stats(p.sku,loc.id).stokBagus!==0).length;
@@ -857,6 +919,46 @@ function pgSettings(){
   ${S.products.length>30?`<div class="tm" style="font-size:11px;padding:10px">Menampilkan 30 produk pertama.</div>`:''}
   </div>`:''}`;
 }
+
+function pgSettingsSet(){
+  const sizes=availableSizes();
+  return`
+  <div class="ib" style="margin-bottom:14px">
+    <strong>Cara kerja Template Set:</strong> Sistem otomatis membaca tipe bracket dari suffix SKU (contoh: -S = Swivel, -F = Fixed, -SB = Swivel Brake, -WO = Wheel Only) dan ukuran dari kode angka (075 = 3"). Pastikan SKU produk kamu sudah menggunakan format ini.
+  </div>
+  <div class="card">
+    <div class="card-t">SKU Terdeteksi per Tipe Bracket</div>
+    <table><thead><tr><th>Tipe</th><th>Keterangan</th><th class="rt">Jumlah SKU Terdeteksi</th><th>Contoh SKU</th></tr></thead><tbody>
+    ${BRACKET_TYPES.map(t=>{
+      const found=S.products.filter(p=>parseSKUTipe(p.sku)===t);
+      return`<tr><td><span class="chip">-${t}</span></td><td>${BRACKET_NAMES[t]}</td><td class="rt ${found.length?'g':'r'}">${found.length} SKU</td><td class="tm">${found.slice(0,3).map(p=>p.sku).join(', ')||'—'}</td></tr>`;
+    }).join('')}
+    </tbody></table>
+  </div>
+  <div class="card">
+    <div class="card-t">Ukuran Tersedia di Database Produk</div>
+    ${!sizes.length?`<div class="empty"><p>Belum ada SKU dengan kode ukuran yang dikenali (025, 040, 050, 075, 100, 125, 150, 200, 250)</p></div>`:`
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+    ${sizes.map(([kode,label])=>`<div style="padding:8px 14px;background:var(--accl);border-radius:8px;border:1px solid #b5d4f4"><div style="font-weight:700">${label}</div><div class="tm" style="font-size:11px">kode: ${kode}</div></div>`).join('')}
+    </div>`}
+  </div>
+  <div class="card">
+    <div class="card-t">Preview Template Set per Ukuran</div>
+    ${!sizes.length?`<div class="empty"><p>Tambah produk dengan suffix tipe SKU dulu</p></div>`:`
+    <div class="tw"><table><thead><tr><th>Template</th>${sizes.map(([k,l])=>`<th class="rt">${l}</th>`).join('')}</tr></thead><tbody>
+    ${SET_TYPES.map(st=>{
+      return`<tr><td><strong>${st.kode}</strong><div class="tm" style="font-size:10px">${st.komposisi.map(k=>k.qty+'x '+BRACKET_NAMES[k.tipe]).join(' + ')}</div></td>
+      ${sizes.map(([sizeKode])=>{
+        const allFound=st.komposisi.every(k=>findSKUForSet(k.tipe,sizeKode).length>0);
+        const skus=st.komposisi.flatMap(k=>findSKUForSet(k.tipe,sizeKode).map(p=>p.sku));
+        return`<td class="rt"><span style="color:${allFound?'var(--ok)':'var(--err)'}">${allFound?'✓ Siap':'✗'}</span><div class="tm" style="font-size:10px">${skus.join(', ')}</div></td>`;
+      }).join('')}
+      </tr>`;
+    }).join('')}
+    </tbody></table></div>`}
+  </div>`;
+}
+
 
 // ═══ DELIVERY ORDER ═══
 function pgDO(){
@@ -892,6 +994,7 @@ function pgDO(){
       <td><span class="bdg ${st[0]}">${st[1]}</span></td>
       <td style="white-space:nowrap">
         <button class="btn btn-ic btn-sm" data-viewdo="${d.id}" title="Lihat"><i class="ti ti-eye"></i></button>
+        <button class="btn btn-ic btn-sm" data-pdfdo="${d.id}" title="Export PDF"><i class="ti ti-file-type-pdf"></i></button>
         ${d.status==='draft'?`<button class="btn btn-ic btn-sm" data-edo="${d.id}" title="Edit"><i class="ti ti-edit"></i></button>`:''}
         ${d.status==='draft'?`<button class="btn btn-sm btn-ok" data-senddo="${d.id}">Kirim</button>`:''}
         ${d.status==='sent'?`<button class="btn btn-sm btn-ok" data-confirmdo="${d.id}">Konfirmasi</button>`:''}
@@ -1291,9 +1394,9 @@ function modal(){
       <div class="fr c3">
         <div><label>Mata Uang</label><select id="fCurr">${CURRENCIES.map(c=>`<option value="${c}">${c}</option>`).join('')}</select></div>
         <div><label>Rate ke IDR</label><input id="fRate" type="number" value="1" min="0" step="0.01"></div>
-        <div><label>Jumlah Bayar</label><input id="fAmt" type="number" value="0" min="0"></div>
+        <div><label>Jumlah Bayar <span class="tm">(default: sisa tagihan)</span></label><input id="fAmt" type="number" value="${sisa}" min="0"></div>
       </div>
-      <div class="sb"><div class="row"><span>Jumlah dalam IDR</span><strong id="payBuyIDR">Rp 0</strong></div></div>
+      <div class="sb"><div class="row"><span>Jumlah dalam IDR (estimasi jika bayar selain IDR)</span><strong id="payBuyIDR">${rp(sisa)}</strong></div></div>
       <div class="fr" style="margin-top:10px"><label>Catatan (Opsional)</label><input id="fNote" placeholder="Catatan..."></div>
       ${(inv.payments||[]).length?`<div class="divider"></div><div style="font-size:11px;font-weight:700;color:var(--t2);margin-bottom:6px">RIWAYAT PEMBAYARAN</div>
       <table><thead><tr><th>Tanggal</th><th>Metode</th><th>Mata Uang</th><th class="rt">Jumlah</th><th class="rt">IDR</th></tr></thead><tbody>
@@ -1725,6 +1828,86 @@ function modal(){
   </div></div>`;
   }
 
+  // JUAL SET KASTOR — live update
+  const _rebindSellSet=()=>{
+    const size=document.getElementById('fSetSize')?.value||'';
+    const tpl=document.getElementById('fSetTemplate')?.value||'';
+    const qty=parseInt(document.getElementById('fSetQty')?.value)||1;
+    const harga=parseFloat(document.getElementById('fSetHarga')?.value)||0;
+    const fee=parseFloat(document.getElementById('fFee')?.value)||0;
+    const ongkir=parseFloat(document.getElementById('fOngkir')?.value)||0;
+    const halfSet=document.getElementById('rHalfSet')?.checked||false;
+    const custId=document.getElementById('fCust')?.value||'';
+    const inv=document.getElementById('fIn')?.value||'';
+    const tgl=document.getElementById('fTg')?.value||today();
+    const halfSku=document.getElementById('fHalfSku')?.value||'';
+    const halfQtySet=parseInt(document.getElementById('fHalfQtySet')?.value)||1;
+    const halfHarga=parseFloat(document.getElementById('fHalfHarga')?.value)||0;
+    S.modal={type:'sellSet',data:{sizeKode:size,templateKode:tpl,qtySet:qty,hargaSet:harga,halfSet,halfSku,halfQtySet,halfHarga,fee,ongkir,custId,inv,tgl}};
+    render();bm();
+  };
+  ['fSetSize','fSetTemplate','fSetQty','rFullSet','rHalfSet'].forEach(id=>{
+    document.getElementById(id)?.addEventListener('change',_rebindSellSet);
+    document.getElementById(id)?.addEventListener('input',_rebindSellSet);
+  });
+  document.querySelectorAll('input[name="setMode"]').forEach(el=>el.addEventListener('change',e=>{
+    const fa=document.getElementById('fullSetArea');
+    const ha=document.getElementById('halfSetArea');
+    if(fa)fa.style.display=e.target.value==='half'?'none':'';
+    if(ha)ha.style.display=e.target.value==='half'?'':'none';
+  }));
+  document.getElementById('bSvSellSet')?.addEventListener('click',()=>{
+    const tgl=document.getElementById('fTg')?.value;
+    const inv=document.getElementById('fIn')?.value||'';
+    const custId=document.getElementById('fCust')?.value||'';
+    const fee=parseFloat(document.getElementById('fFee')?.value)||0;
+    const ongkir=parseFloat(document.getElementById('fOngkir')?.value)||0;
+    const halfSet=document.getElementById('rHalfSet')?.checked||false;
+    if(!tgl){alert('Tanggal wajib diisi');return;}
+    let items=[];
+    if(!halfSet){
+      const size=document.getElementById('fSetSize')?.value||'';
+      const tplKode=document.getElementById('fSetTemplate')?.value||'';
+      const qtySet=parseInt(document.getElementById('fSetQty')?.value)||1;
+      const hargaSet=parseFloat(document.getElementById('fSetHarga')?.value)||0;
+      if(!size){alert('Pilih ukuran roda');return;}
+      if(!tplKode){alert('Pilih template set');return;}
+      const tpl=SET_TYPES.find(t=>t.kode===tplKode);
+      if(!tpl){alert('Template tidak ditemukan');return;}
+      // expand template ke items
+      const expanded=[];
+      for(const k of tpl.komposisi){
+        const found=findSKUForSet(k.tipe,size);
+        if(!found.length){alert('SKU tidak ditemukan untuk tipe '+BRACKET_NAMES[k.tipe]+' ukuran '+SIZE_MAP[size]+'. Pastikan SKU menggunakan suffix -'+k.tipe);return;}
+        // gunakan SKU pertama yang ditemukan
+        const p=found[0];
+        const qtyPcs=k.qty*qtySet;
+        const s=stats(p.sku);
+        // harga per pcs = harga set / 4 (proporsional)
+        const hjPerPcs=hargaSet/4;
+        expanded.push({id:uid(),sku:p.sku,nama:p.nama,brand:p.brand||'',hjAsli:hjPerPcs,hj:hjPerPcs,disc:0,qty:qtyPcs,total:hjPerPcs*qtyPcs,hpp:s.avg});
+      }
+      // verify total = harga set (minor rounding fix)
+      const totalExpanded=expanded.reduce((a,i)=>a+i.total,0);
+      const diff=hargaSet*qtySet-totalExpanded;
+      if(expanded.length>0&&Math.abs(diff)>0)expanded[0].total+=diff;
+      items=expanded;
+    }else{
+      const halfSku=document.getElementById('fHalfSku')?.value||'';
+      const halfQtySet=parseInt(document.getElementById('fHalfQtySet')?.value)||1;
+      const halfHarga=parseFloat(document.getElementById('fHalfHarga')?.value)||0;
+      if(!halfSku){alert('Pilih SKU untuk ½ set');return;}
+      const p=S.products.find(x=>x.sku===halfSku);
+      const s=p?stats(halfSku):{avg:0};
+      const qtyPcs=2*halfQtySet; // ½ set = 2 pcs
+      items=[{id:uid(),sku:halfSku,nama:p?.nama||'',brand:p?.brand||'',hjAsli:halfHarga/2,hj:halfHarga/2,disc:0,qty:qtyPcs,total:halfHarga*halfQtySet,hpp:s.avg}];
+    }
+    if(!items.length){alert('Tidak ada item yang bisa dibuat');return;}
+    S.sales.push({id:uid(),tgl,inv,custId,ch:'Offline',fee,ongkir,locId:S.filterLoc||'',ppnOn:false,items,payTerm:'cash',payments:[],payStatus:'paid',danaStatus:'cair'});
+    save();S.modal=null;render();
+    toast('Penjualan set berhasil dicatat — '+items.length+' SKU, '+items.reduce((a,i)=>a+i.qty,0)+' pcs total');
+  });
+
   // EDIT CICILAN PIUTANG
   if(type==='editPaySell'){
     const {saleId,payId}=d;
@@ -1849,11 +2032,18 @@ function modal(){
         <span>SKU / Produk</span><span>Qty</span><span></span>
       </div>
       <div id="doItemList">
-        ${items.map((it,i)=>`<div class="doItemLine" style="display:grid;grid-template-columns:2fr 120px 36px;gap:6px;margin-bottom:6px;align-items:center">
-          <select class="doSku"><option value="">— Pilih SKU —</option>${S.products.map(p=>`<option value="${p.sku}" ${it.sku===p.sku?'selected':''}>${p.sku} — ${p.nama}</option>`).join('')}</select>
-          <input class="doQty" type="number" value="${it.qty||1}" min="1" style="padding:8px;border:1px solid var(--bd);border-radius:7px">
-          <button class="btn btn-ic btn-sm btn-d doRemLine"><i class="ti ti-minus"></i></button>
-        </div>`).join('')}
+        ${items.map((it,i)=>{
+          const _fromL=S.locations.find(l=>l.id===d.fromLocId);
+          const _sStok=it.sku?(_fromL?stats(it.sku,_fromL.id):stats(it.sku)):{stokBagus:null};
+          const _stokInfo=it.sku&&_sStok.stokBagus!=null?('Stok: <strong style="color:'+(_sStok.stokBagus<0?'var(--err)':_sStok.stokBagus<(it.qty||1)?'var(--warn)':'var(--ok)')+'">'+fmt(_sStok.stokBagus)+' pcs</strong>'+(_fromL?' di '+_fromL.nama:'')):'';
+          return`<div class="doItemLine" style="display:grid;grid-template-columns:2fr 80px 36px;gap:6px;margin-bottom:8px;align-items:start">
+            <div>
+              <select class="doSku" style="width:100%;padding:7px;border:1px solid var(--bd);border-radius:7px;font-family:inherit;font-size:12px"><option value="">— Pilih SKU —</option>${S.products.map(p=>`<option value="${p.sku}" ${it.sku===p.sku?'selected':''}>${p.sku} — ${p.nama}</option>`).join('')}</select>
+              <div class="doStokInfo" style="font-size:11px;margin-top:3px;padding:0 2px">${_stokInfo}</div>
+            </div>
+            <input class="doQty" type="number" value="${it.qty||1}" min="1" style="padding:7px;border:1px solid var(--bd);border-radius:7px;text-align:center">
+            <button class="btn btn-ic btn-sm btn-d doRemLine"><i class="ti ti-minus"></i></button>
+          </div>`;}).join('')}
       </div>
       <div class="ib" style="margin-top:8px;font-size:11px">Stok akan bergerak dari lokasi sumber ke tujuan <strong>hanya setelah penerima klik "Konfirmasi Terima"</strong>.</div>
     </div>
@@ -1890,8 +2080,86 @@ function modal(){
     </div>
     <div class="mf">
       ${d2.status==='sent'?`<button class="btn btn-ok" data-confirmdo="${d2.id}" id="bConfFromView"><i class="ti ti-check"></i> Konfirmasi Terima Barang</button>`:''}
+      <button class="btn" id="bPdfDO" data-doid="${d2.id}"><i class="ti ti-file-type-pdf"></i> Export PDF</button>
       <button class="btn btn-p" id="bCl2">Tutup</button>
     </div>
+  </div></div>`;
+  }
+
+  // JUAL SET KASTOR
+  if(type==='sellSet'){
+    const sizes=availableSizes();
+    const selSize=d.sizeKode||'';
+    const selTemplate=d.templateKode||'';
+    const selQtySet=d.qtySet||1;
+    const selHalfSet=d.halfSet||false;
+    const selHalfSku=d.halfSku||'';
+    const selHalfQty=2; // ½ set = 2 pcs
+    const tpl=SET_TYPES.find(t=>t.kode===selTemplate);
+    // preview komposisi
+    let previewHtml='';
+    if(selTemplate&&selSize&&!selHalfSet){
+      const items=tpl?tpl.komposisi.flatMap(k=>{
+        const found=findSKUForSet(k.tipe,selSize);
+        return found.map(p=>({sku:p.sku,nama:p.nama,qty:k.qty*selQtySet,tipe:k.tipe}));
+      }):[];
+      if(items.length){
+        previewHtml=`<div class="sb" style="margin-top:10px"><div style="font-size:11px;font-weight:700;color:var(--t2);margin-bottom:8px">PREVIEW STOK DIKURANGI</div>
+        ${items.map(it=>{
+          const s=stats(it.sku,S.filterLoc||undefined);
+          return`<div class="row"><span><span class="chip">${it.sku}</span> ${it.nama} <span class="tm">(${BRACKET_NAMES[it.tipe]})</span></span><span class="${s.stokBagus<it.qty?'r':'g'}">−${fmt(it.qty)} pcs (sisa: ${fmt(s.stokBagus-it.qty)})</span></div>`;
+        }).join('')}</div>`;
+      }else{
+        previewHtml=`<div class="ib" style="background:var(--errl);border-color:var(--err);margin-top:10px">Tidak ditemukan SKU yang cocok untuk template ${selTemplate} ukuran ${SIZE_MAP[selSize]||selSize}. Pastikan SKU menggunakan suffix tipe (-S, -F, -SB, -WO).</div>`;
+      }
+    }
+    // half set SKU options
+    const halfSkuOpts=selSize?S.products.filter(p=>parseSKUSize(p.sku)?.kode===selSize).map(p=>`<option value="${p.sku}" ${selHalfSku===p.sku?'selected':''}>${p.sku} — ${p.nama}</option>`).join(''):'';
+    const custOpts=S.customers.map(c=>`<option value="${c.id}" ${d.custId===c.id?'selected':''}>${c.nama}</option>`).join('');
+    return`<div class="ov" id="mOv"><div class="modal modal-lg">
+    <div class="mh"><h3>Jual Set Kastor</h3><button class="btn btn-ic" id="bCl"><i class="ti ti-x"></i></button></div>
+    <div class="mb">
+      <div class="fr c3">
+        <div><label>Tanggal</label><input id="fTg" type="date" value="${d.tgl||today()}"></div>
+        <div><label>No. Invoice</label><input id="fIn" value="${d.inv||''}" placeholder="INV-001"></div>
+        <div><label>Customer</label><select id="fCust"><option value="">— Pilih —</option>${custOpts}</select></div>
+      </div>
+      <div class="fr c2">
+        <div><label>Ukuran Roda</label><select id="fSetSize">
+          <option value="">— Pilih Ukuran —</option>
+          ${sizes.map(([k,l])=>`<option value="${k}" ${selSize===k?'selected':''}>${l} (${k})</option>`).join('')}
+        </select></div>
+        <div><label>Mode</label>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-weight:400"><input type="radio" name="setMode" id="rFullSet" value="full" ${!selHalfSet?'checked':''}> Set Penuh (4 pcs)</label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-weight:400"><input type="radio" name="setMode" id="rHalfSet" value="half" ${selHalfSet?'checked':''}> ½ Set (2 pcs, 1 SKU)</label>
+          </div>
+        </div>
+      </div>
+      <div id="fullSetArea" style="${selHalfSet?'display:none':''}">
+        <div class="fr c3">
+          <div><label>Template Set</label><select id="fSetTemplate">
+            <option value="">— Pilih Template —</option>
+            ${SET_TYPES.map(t=>`<option value="${t.kode}" ${selTemplate===t.kode?'selected':''}>${t.nama}</option>`).join('')}
+          </select></div>
+          <div><label>Qty Set</label><input id="fSetQty" type="number" value="${selQtySet}" min="1" placeholder="Berapa set?"></div>
+          <div><label>Harga per Set (Rp)</label><input id="fSetHarga" type="number" value="${d.hargaSet||0}" min="0"></div>
+        </div>
+        ${previewHtml}
+      </div>
+      <div id="halfSetArea" style="${selHalfSet?'':'display:none'}">
+        <div class="fr c3">
+          <div><label>SKU Produk (½ set = 2 pcs)</label><select id="fHalfSku"><option value="">— Pilih SKU —</option>${halfSkuOpts}</select></div>
+          <div><label>Jumlah ½ Set (minimal 1)</label><input id="fHalfQtySet" type="number" value="${d.halfQtySet||1}" min="1"></div>
+          <div><label>Harga per ½ Set (Rp)</label><input id="fHalfHarga" type="number" value="${d.halfHarga||0}" min="0"></div>
+        </div>
+      </div>
+      <div class="fr c2" style="margin-top:8px">
+        <div><label>Fee Marketplace (Rp)</label><input id="fFee" type="number" value="${d.fee||0}" min="0"></div>
+        <div><label>Ongkir (Rp)</label><input id="fOngkir" type="number" value="${d.ongkir||0}" min="0"></div>
+      </div>
+    </div>
+    <div class="mf"><button class="btn" id="bCl2">Batal</button><button class="btn btn-p" id="bSvSellSet">Proses & Simpan</button></div>
   </div></div>`;
   }
   return'';
@@ -2009,6 +2277,68 @@ function updateSellSummary(){
 }
 
 // ═══ PDF & EXCEL EXPORT ═══
+function exportDOpdf(doId){
+  const doObj=S.deliveryOrders.find(x=>x.id===doId);if(!doObj)return;
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const W=297,ML=14,MR=14,MT=16;
+  // header
+  doc.setFontSize(18);doc.setFont(undefined,'bold');
+  doc.text('DELIVERY ORDER',ML,MT+2);
+  doc.setFontSize(10);doc.setFont(undefined,'normal');
+  const fromL=S.locations.find(l=>l.id===doObj.fromLocId);
+  const toL=S.locations.find(l=>l.id===doObj.toLocId);
+  const stMap={draft:'Draft',sent:'Dikirim',confirmed:'Diterima',cancelled:'Dibatalkan'};
+  // info box kanan
+  const infoX=W-MR-80;
+  doc.setDrawColor(200);doc.rect(infoX,MT-6,80,26);
+  doc.setFont(undefined,'bold');doc.text('No. DO:',infoX+2,MT);
+  doc.setFont(undefined,'normal');doc.text(doObj.noDO||'-',infoX+25,MT);
+  doc.setFont(undefined,'bold');doc.text('Tanggal:',infoX+2,MT+6);
+  doc.setFont(undefined,'normal');doc.text(fd(doObj.tgl),infoX+25,MT+6);
+  doc.setFont(undefined,'bold');doc.text('Status:',infoX+2,MT+12);
+  doc.setFont(undefined,'normal');doc.text(stMap[doObj.status]||'-',infoX+25,MT+12);
+  // info lokasi
+  const infoY=MT+8;
+  doc.setFont(undefined,'bold');doc.text('Dari Lokasi:',ML,infoY+6);
+  doc.setFont(undefined,'normal');doc.text(fromL?fromL.nama+' ('+fromL.tipe+')':'-',ML+30,infoY+6);
+  doc.setFont(undefined,'bold');doc.text('Ke Lokasi:',ML,infoY+12);
+  doc.setFont(undefined,'normal');doc.text(toL?toL.nama+' ('+toL.tipe+')':'-',ML+30,infoY+12);
+  if(doObj.catatan){doc.setFont(undefined,'bold');doc.text('Catatan:',ML,infoY+18);doc.setFont(undefined,'normal');doc.text(doObj.catatan,ML+20,infoY+18);}
+  // tabel items
+  const tableY=infoY+24;
+  const rows=(doObj.items||[]).map((it,n)=>{
+    const p=S.products.find(pp=>pp.sku===it.sku);
+    const fromSt=fromL?stats(it.sku,fromL.id):stats(it.sku);
+    return[n+1,it.sku,p?p.nama:'-',fmt(it.qty),'pcs',fmt(fromSt.stokBagus),''];
+  });
+  doc.autoTable({startY:tableY,
+    head:[['No','SKU','Nama Barang','Qty','Satuan','Stok Sumber','Ket.']],
+    body:rows,
+    theme:'grid',
+    headStyles:{fillColor:[24,95,165],fontSize:10},
+    bodyStyles:{fontSize:10},
+    columnStyles:{0:{cellWidth:10},1:{cellWidth:30},2:{cellWidth:80},3:{cellWidth:18,halign:'center'},4:{cellWidth:18},5:{cellWidth:28,halign:'center'},6:{cellWidth:40}},
+  });
+  // signature section
+  const sigY=doc.lastAutoTable.finalY+14;
+  const sigW=(W-ML-MR)/3;
+  const sigs=[['Disiapkan oleh',fromL?fromL.nama:'Pengirim'],['Dikirim oleh','Kurir / Driver'],['Diterima oleh',toL?toL.nama:'Penerima']];
+  sigs.forEach((s,i)=>{
+    const x=ML+i*sigW;
+    doc.setFontSize(10);doc.setFont(undefined,'bold');
+    doc.text(s[0],x+sigW/2,sigY,{align:'center'});
+    doc.setFont(undefined,'normal');doc.text('('+s[1]+')',x+sigW/2,sigY+5,{align:'center'});
+    // signature box
+    doc.setDrawColor(180);doc.rect(x+4,sigY+8,sigW-8,22);
+    // name + date line at bottom
+    doc.setFontSize(9);
+    doc.text('Nama   : ___________________',x+6,sigY+34);
+    doc.text('Tgl      : ___________________',x+6,sigY+40);
+  });
+  doc.save('DO_'+(doObj.noDO||doObj.id)+'.pdf');
+}
+
 function exportPOpdf(po){
   const {jsPDF}=window.jspdf;const doc=new jsPDF();
   const sup=S.suppliers.find(s=>s.id===po.supId);
@@ -2283,6 +2613,7 @@ function bind(){
   document.getElementById('bImpSell')?.addEventListener('click',()=>{S.imp={mode:'sell'};S.modal={type:'import',data:{mode:'sell'}};render();bm();});
   document.getElementById('bAddPO')?.addEventListener('click',()=>{S.modal={type:'po',data:{}};render();bm();});
   document.getElementById('bAddBuy')?.addEventListener('click',()=>{S.modal={type:'buy',data:{}};render();bm();});
+  document.getElementById('bAddSet')?.addEventListener('click',()=>{S.modal={type:'sellSet',data:{}};render();bm();});
   document.getElementById('bAddSell')?.addEventListener('click',()=>{S.modal={type:'sell',data:{}};render();bm();});
   document.getElementById('bAddSup')?.addEventListener('click',()=>{S.modal={type:'sup',data:{}};render();bm();});
   document.getElementById('bAddCust')?.addEventListener('click',()=>{S.modal={type:'cust',data:{}};render();bm();});
@@ -2290,11 +2621,13 @@ function bind(){
   document.getElementById('bAddRet')?.addEventListener('click',()=>{S.modal={type:'ret',data:{}};render();bm();});
   document.getElementById('bAddKonv')?.addEventListener('click',()=>{S.modal={type:'konversi',data:{}};render();bm();});
   // LOKASI
+  document.querySelectorAll('[data-stab]').forEach(el=>el.addEventListener('click',()=>{S.settingsTab=el.dataset.stab;S.q='';render();}));
   document.getElementById('bAddLoc')?.addEventListener('click',()=>{S.modal={type:'loc',data:{}};render();bm();});
   document.querySelectorAll('[data-eloc]').forEach(el=>el.addEventListener('click',()=>{const l=S.locations.find(x=>x.id===el.dataset.eloc);if(l){S.modal={type:'loc',data:{...l}};render();bm();}}));
   document.querySelectorAll('[data-dloc]').forEach(el=>el.addEventListener('click',()=>{if(confirm('Hapus lokasi ini? Data stok awal di lokasi ini akan hilang.')){S.locations=S.locations.filter(x=>x.id!==el.dataset.dloc);save();render();}}));
   // DO
   document.getElementById('bAddDO')?.addEventListener('click',()=>{S.modal={type:'do',data:{}};render();bm();});
+  document.querySelectorAll('[data-pdfdo]').forEach(el=>el.addEventListener('click',()=>{exportDOpdf(el.dataset.pdfdo);}));
   document.querySelectorAll('[data-viewdo]').forEach(el=>el.addEventListener('click',()=>{S.modal={type:'viewDO',data:{id:el.dataset.viewdo}};render();bm();}));
   document.querySelectorAll('[data-edo]').forEach(el=>el.addEventListener('click',()=>{const d=S.deliveryOrders.find(x=>x.id===el.dataset.edo);if(d){S.modal={type:'do',data:{...d}};render();bm();}}));
   document.querySelectorAll('[data-senddo]').forEach(el=>el.addEventListener('click',()=>{if(!confirm('Kirim DO ini ke tujuan? Status akan berubah ke Dikirim.'))return;S.deliveryOrders=S.deliveryOrders.map(x=>x.id===el.dataset.senddo?{...x,status:'sent'}:x);save();render();toast('DO dikirim');}));
@@ -2366,7 +2699,7 @@ function bind(){
   document.getElementById('mOv')?.addEventListener('click',e=>{if(e.target.id==='mOv'){S.modal=null;render();}});
   // export/import
   document.getElementById('bExp')?.addEventListener('click',()=>{
-    const keys=['products','purchases','sales','suppliers','customers','expenses','returns','purchaseOrders','stockConversions','locations','deliveryOrders'];
+    const keys=['products','purchases','sales','suppliers','customers','expenses','returns','purchaseOrders','stockConversions','locations','deliveryOrders','setTemplates'];
     const d=JSON.stringify(Object.fromEntries(keys.map(k=>[k,S[k]])),null,2);
     const a=document.createElement('a');a.href='data:application/json,'+encodeURIComponent(d);
     a.download='hwtools-v21-'+today()+'.json';a.click();toast('Data diekspor');
@@ -2724,11 +3057,36 @@ function bm(){
   document.getElementById('bAddItemDO')?.addEventListener('click',()=>{
     const list=document.getElementById('doItemList');if(!list)return;
     const div=document.createElement('div');
-    div.className='doItemLine';div.style.cssText='display:grid;grid-template-columns:2fr 120px 36px;gap:6px;margin-bottom:6px;align-items:center';
-    div.innerHTML=`<select class="doSku" style="padding:8px;border:1px solid var(--bd);border-radius:7px;font-family:inherit;font-size:12px"><option value="">— Pilih SKU —</option>${S.products.map(p=>`<option value="${p.sku}">${p.sku} — ${p.nama}</option>`).join('')}</select><input class="doQty" type="number" value="1" min="1" style="padding:8px;border:1px solid var(--bd);border-radius:7px;text-align:center"><button class="btn btn-ic btn-sm btn-d doRemLine"><i class="ti ti-minus"></i></button>`;
+    div.className='doItemLine';div.style.cssText='display:grid;grid-template-columns:2fr 80px 36px;gap:6px;margin-bottom:8px;align-items:start';
+    div.innerHTML=`<div><select class="doSku" style="width:100%;padding:7px;border:1px solid var(--bd);border-radius:7px;font-family:inherit;font-size:12px"><option value="">— Pilih SKU —</option>${S.products.map(p=>`<option value="${p.sku}">${p.sku} — ${p.nama}</option>`).join('')}</select><div class="doStokInfo" style="font-size:11px;margin-top:3px;padding:0 2px">—</div></div><input class="doQty" type="number" value="1" min="1" style="padding:7px;border:1px solid var(--bd);border-radius:7px;text-align:center"><button class="btn btn-ic btn-sm btn-d doRemLine"><i class="ti ti-minus"></i></button>`;
     list.appendChild(div);
-    div.querySelector('.doRemLine')?.addEventListener('click',()=>div.remove());
+    const _newLine=list.lastElementChild;
+    _newLine.querySelector('.doRemLine')?.addEventListener('click',()=>_newLine.remove());
+    _bindDOSku(_newLine);
   });
+  const _bindDOSku=function(line){
+    const sel=line.querySelector('.doSku');
+    const info=line.querySelector('.doStokInfo');
+    const qtyEl=line.querySelector('.doQty');
+    if(!sel||!info)return;
+    const _upd=function(){
+      const sku=sel.value;
+      const fromLocId=document.getElementById('fFromLoc')?.value||'';
+      const fromL=S.locations.find(l=>l.id===fromLocId);
+      if(!sku){info.innerHTML='—';return;}
+      const s=fromLocId?stats(sku,fromLocId):stats(sku);
+      const qty=parseFloat(qtyEl?.value)||1;
+      const clr=s.stokBagus<0?'var(--err)':s.stokBagus<qty?'var(--warn)':'var(--ok)';
+      info.innerHTML='Stok: <strong style="color:'+clr+'">'+fmt(s.stokBagus)+' pcs</strong>'+(fromL?' di '+fromL.nama:'');
+    };
+    sel.addEventListener('change',_upd);
+    qtyEl?.addEventListener('input',_upd);
+    if(sel.value)setTimeout(_upd,10);
+  };
+  document.getElementById('fFromLoc')?.addEventListener('change',function(){
+    document.querySelectorAll('.doItemLine').forEach(_bindDOSku);
+  });
+  document.querySelectorAll('.doItemLine').forEach(_bindDOSku);
   document.querySelectorAll('.doRemLine').forEach(btn=>btn.addEventListener('click',()=>btn.closest('.doItemLine')?.remove()));
   document.getElementById('bSvDO')?.addEventListener('click',function(){
     const id=this.dataset.id;
@@ -2754,6 +3112,8 @@ function bm(){
     save();S.modal=null;render();
   });
   // confirm DO from viewDO modal
+  const _bPdfDO=document.getElementById('bPdfDO');
+  if(_bPdfDO)_bPdfDO.addEventListener('click',function(){exportDOpdf(this.dataset.doid);});
   document.getElementById('bConfFromView')?.addEventListener('click',function(){
     const doId=this.dataset.confirmdo;
     if(!confirm('Konfirmasi terima barang? Stok akan bergerak ke lokasi tujuan.'))return;
