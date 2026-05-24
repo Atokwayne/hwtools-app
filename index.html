@@ -148,6 +148,7 @@ const cur=(n,c)=>(c||'IDR')+' '+fmt2(n);
 const pct=n=>((n||0)*100).toFixed(1)+'%';
 const fd=d=>d?new Date(d).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'}):'';
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2);
+const esc=s=>String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const today=()=>new Date().toISOString().slice(0,10);
 
 let S={
@@ -342,7 +343,7 @@ function layout(){
     produk:`<button class="btn" id="bImpProd"><i class="ti ti-file-import"></i> Import SKU</button><button class="btn btn-p" id="bAddP"><i class="ti ti-plus"></i> Tambah Produk</button>`,
     po:`<button class="btn btn-p" id="bAddPO"><i class="ti ti-plus"></i> Buat PO</button>`,
     pembelian:`<button class="btn btn-p" id="bAddBuy"><i class="ti ti-plus"></i> Catat Pembelian</button>`,
-    penjualan:`<button class="btn btn-ok" id="bAddSet"><i class="ti ti-package"></i> Jual Set Kastor</button><button class="btn" id="bImpSell"><i class="ti ti-file-import"></i> Import Penjualan</button><button class="btn btn-p" id="bAddSell"><i class="ti ti-plus"></i> Catat Penjualan</button>`,
+    penjualan:`<button class="btn" id="bImpSell"><i class="ti ti-file-import"></i> Import Penjualan</button><button class="btn btn-p" id="bAddSell"><i class="ti ti-plus"></i> Catat Penjualan</button>`,
     supplier:`<button class="btn btn-p" id="bAddSup"><i class="ti ti-plus"></i> Tambah Supplier</button>`,
     customer:`<button class="btn btn-p" id="bAddCust"><i class="ti ti-plus"></i> Tambah Customer</button>`,
     biaya:`<button class="btn btn-p" id="bAddExp"><i class="ti ti-plus"></i> Catat Biaya</button>`,
@@ -1175,8 +1176,8 @@ function modal(){
     <div class="mh"><h3>${d.id?'Edit Produk':'Tambah Produk'}</h3><button class="btn btn-ic" id="bCl"><i class="ti ti-x"></i></button></div>
     <div class="mb">
       <div class="fr c2"><div><label>Brand</label><select id="fBr">${BRANDS.map(b=>`<option value="${b}" ${d.brand===b?'selected':''}>${b}</option>`).join('')}</select></div>
-      <div><label>SKU ${d.id?'<span class="tm">(perubahan SKU akan update semua data terkait)</span>':''}</label><input id="fSk" value="${d.sku||''}" placeholder="Contoh: TKR-001"></div></div>
-      <div class="fr"><label>Nama Barang</label><input id="fNm" value="${d.nama||''}" placeholder="Nama lengkap produk"></div>
+      <div><label>SKU ${d.id?'<span class="tm">(perubahan SKU akan update semua data terkait)</span>':''}</label><input id="fSk" value="${esc(d.sku||'')} " placeholder="Contoh: TKR-001"></div></div>
+      <div class="fr"><label>Nama Barang</label><input id="fNm" value="${esc(d.nama||'')} " placeholder="Nama lengkap produk"></div>
       <div class="fr c3">
         <div><label>Modal Awal (Rp)</label><input id="fMd" type="number" value="${d.m||0}" min="0"></div>
         <div><label>Stok Awal Bagus (Legacy/Total)</label><input id="fSb" type="number" value="${d.sb||0}" min="0"></div>
@@ -1215,7 +1216,7 @@ function modal(){
     <div class="mb">
       <div class="fr c4">
         <div><label>Tanggal</label><input id="fTg" type="date" value="${d.tgl||today()}"></div>
-        <div><label>No. PO</label><input id="fNoPO" value="${d.noPO||''}" placeholder="PO-001"></div>
+        <div><label>No. PO</label><input id="fNoPO" value="${esc(d.noPO||'')} " placeholder="PO-001"></div>
         <div><label>Supplier</label><select id="fSup"><option value="">— Pilih —</option>${supOpts}</select></div>
         <div><label>Status</label><select id="fStatus">
           <option value="draft" ${d.status==='draft'||!d.status?'selected':''}>Draft</option>
@@ -1247,7 +1248,7 @@ function modal(){
         <div class="row"><span>Total PO</span><strong id="poGrand">—</strong></div>
         <div class="row"><span>Estimasi dalam IDR</span><strong id="poGrandIDR">—</strong></div>
       </div>
-      <div class="fr" style="margin-top:10px"><label>Catatan (Opsional)</label><textarea id="fNote" rows="2" placeholder="Catatan PO...">${d.note||''}</textarea></div>
+      <div class="fr" style="margin-top:10px"><label>Catatan (Opsional)</label><textarea id="fNote" rows="2" placeholder="Catatan PO...">${esc(d.note||'')} </textarea></div>
     </div>
     <div class="mf"><button class="btn" id="bCl2">Batal</button><button class="btn btn-p" id="bSvPO" data-id="${d.id||''}">Simpan PO</button></div>
   </div></div>`;
@@ -1262,7 +1263,7 @@ function modal(){
     <div class="mb">
       <div class="fr c3">
         <div><label>Tanggal</label><input id="fTg" type="date" value="${d.tgl||today()}"></div>
-        <div><label>No. Invoice</label><input id="fIn" value="${d.inv||''}" placeholder="INV-001"></div>
+        <div><label>No. Invoice</label><input id="fIn" value="${esc(d.inv||'')} " placeholder="INV-001"></div>
         <div><label>Supplier</label><select id="fSup"><option value="">— Pilih —</option>${supOpts}</select></div>
       </div>
       <div class="fr c3">
@@ -1297,7 +1298,7 @@ function modal(){
     <div class="mb">
       <div class="fr c3">
         <div><label>Tanggal</label><input id="fTg" type="date" value="${d.tgl||today()}"></div>
-        <div><label>No. Invoice</label><input id="fIn" value="${d.inv||''}" placeholder="INV-001"></div>
+        <div><label>No. Invoice</label><input id="fIn" value="${esc(d.inv||'')} " placeholder="INV-001"></div>
         <div><label>Customer</label><select id="fCust"><option value="">— Pilih —</option>${custOpts}</select></div>
       </div>
       <div class="fr c3">
@@ -1319,9 +1320,7 @@ function modal(){
         <label style="margin:0">Item Produk</label>
         <button class="btn btn-sm btn-p" id="bAddItemSell"><i class="ti ti-plus"></i> Tambah SKU</button>
       </div>
-      <div style="font-size:11px;color:var(--t2);display:grid;grid-template-columns:1fr 110px 80px 70px 100px 36px;gap:6px;padding:0 8px;margin-bottom:4px">
-        <span>SKU / Produk</span><span>Harga Jual</span><span>Disc%</span><span>Qty</span><span>Total</span><span></span>
-      </div>
+      <div style="font-size:11px;color:var(--t2);padding:0 2px;margin-bottom:4px">SKU / Produk — Harga Jual — Disc% — Qty — Total &nbsp;|&nbsp; Centang "Jual sebagai Set" untuk input set kastor</div>
       <div id="itemListSell">${items.map((it,i)=>skuLineSell(it,i)).join('')}</div>
       <div class="fr c3" style="margin-top:10px">
         <div><label>Biaya Kirim / Ongkir (Rp)</label><input id="fOngkir" type="number" value="${d.ongkir||0}" min="0"></div>
@@ -1411,13 +1410,13 @@ function modal(){
   if(type==='sup')return`<div class="ov" id="mOv"><div class="modal">
     <div class="mh"><h3>${d.id?'Edit Supplier':'Tambah Supplier'}</h3><button class="btn btn-ic" id="bCl"><i class="ti ti-x"></i></button></div>
     <div class="mb">
-      <div class="fr c2"><div><label>Nama Supplier *</label><input id="fNm" value="${d.nama||''}" placeholder="Nama perusahaan"></div>
-      <div><label>PIC (Opsional)</label><input id="fPic" value="${d.pic||''}"></div></div>
-      <div class="fr c2"><div><label>No. Telp (Opsional)</label><input id="fTelp" value="${d.telp||''}"></div>
-      <div><label>Email (Opsional)</label><input id="fEmail" value="${d.email||''}"></div></div>
-      <div class="fr"><label>Alamat (Opsional)</label><textarea id="fAlamat" rows="2">${d.alamat||''}</textarea></div>
-      <div class="fr c2"><div><label>NPWP (Opsional)</label><input id="fNpwp" value="${d.npwp||''}"></div>
-      <div><label>Catatan (Opsional)</label><input id="fNote" value="${d.note||''}"></div></div>
+      <div class="fr c2"><div><label>Nama Supplier *</label><input id="fNm" value="${esc(d.nama||'')} " placeholder="Nama perusahaan"></div>
+      <div><label>PIC (Opsional)</label><input id="fPic" value="${esc(d.pic||'')} "></div></div>
+      <div class="fr c2"><div><label>No. Telp (Opsional)</label><input id="fTelp" value="${esc(d.telp||'')} "></div>
+      <div><label>Email (Opsional)</label><input id="fEmail" value="${esc(d.email||'')} "></div></div>
+      <div class="fr"><label>Alamat (Opsional)</label><textarea id="fAlamat" rows="2">${esc(d.alamat||'')} </textarea></div>
+      <div class="fr c2"><div><label>NPWP (Opsional)</label><input id="fNpwp" value="${esc(d.npwp||'')} "></div>
+      <div><label>Catatan (Opsional)</label><input id="fNote" value="${esc(d.note||'')} "></div></div>
     </div>
     <div class="mf"><button class="btn" id="bCl2">Batal</button><button class="btn btn-p" id="bSvSup" data-id="${d.id||''}">Simpan</button></div>
   </div></div>`;
@@ -1426,14 +1425,14 @@ function modal(){
   if(type==='cust')return`<div class="ov" id="mOv"><div class="modal">
     <div class="mh"><h3>${d.id?'Edit Customer':'Tambah Customer'}</h3><button class="btn btn-ic" id="bCl"><i class="ti ti-x"></i></button></div>
     <div class="mb">
-      <div class="fr c2"><div><label>Nama Customer *</label><input id="fNm" value="${d.nama||''}"></div>
+      <div class="fr c2"><div><label>Nama Customer *</label><input id="fNm" value="${esc(d.nama||'')} "></div>
       <div><label>Tipe</label><select id="fTipe"><option value="Retail" ${d.tipe==='Retail'?'selected':''}>Retail</option><option value="Corporate" ${d.tipe==='Corporate'?'selected':''}>Corporate</option><option value="Reseller" ${d.tipe==='Reseller'?'selected':''}>Reseller</option></select></div></div>
-      <div class="fr c2"><div><label>PIC (Opsional)</label><input id="fPic" value="${d.pic||''}"></div>
-      <div><label>No. Telp (Opsional)</label><input id="fTelp" value="${d.telp||''}"></div></div>
-      <div class="fr c2"><div><label>Email (Opsional)</label><input id="fEmail" value="${d.email||''}"></div>
-      <div><label>NPWP (Opsional)</label><input id="fNpwp" value="${d.npwp||''}"></div></div>
-      <div class="fr"><label>Alamat (Opsional)</label><textarea id="fAlamat" rows="2">${d.alamat||''}</textarea></div>
-      <div class="fr"><label>Catatan (Opsional)</label><input id="fNote" value="${d.note||''}"></div>
+      <div class="fr c2"><div><label>PIC (Opsional)</label><input id="fPic" value="${esc(d.pic||'')} "></div>
+      <div><label>No. Telp (Opsional)</label><input id="fTelp" value="${esc(d.telp||'')} "></div></div>
+      <div class="fr c2"><div><label>Email (Opsional)</label><input id="fEmail" value="${esc(d.email||'')} "></div>
+      <div><label>NPWP (Opsional)</label><input id="fNpwp" value="${esc(d.npwp||'')} "></div></div>
+      <div class="fr"><label>Alamat (Opsional)</label><textarea id="fAlamat" rows="2">${esc(d.alamat||'')} </textarea></div>
+      <div class="fr"><label>Catatan (Opsional)</label><input id="fNote" value="${esc(d.note||'')} "></div>
     </div>
     <div class="mf"><button class="btn" id="bCl2">Batal</button><button class="btn btn-p" id="bSvCust" data-id="${d.id||''}">Simpan</button></div>
   </div></div>`;
@@ -1447,10 +1446,10 @@ function modal(){
     <div class="mb">
       <div class="fr c2"><div><label>Tanggal</label><input id="fTg" type="date" value="${d.tgl||today()}"></div>
       <div><label>Kategori</label><select id="fCat">${EXPENSE_CATS.map(c=>`<option value="${c}" ${d.cat===c?'selected':''}>${c}</option>`).join('')}</select></div></div>
-      <div class="fr"><label>Deskripsi</label><input id="fDesc" value="${d.deskripsi||''}" placeholder="Keterangan biaya..."></div>
+      <div class="fr"><label>Deskripsi</label><input id="fDesc" value="${esc(d.deskripsi||'')} " placeholder="Keterangan biaya..."></div>
       <div class="fr c2"><div><label>Jumlah (Rp)</label><input id="fJml" type="number" value="${d.jumlah||0}" min="0"></div>
       <div><label>Supplier / Vendor (Opsional)</label><select id="fSupExp"><option value="">— Tidak ada —</option>${supOpts}</select></div></div>
-      <div class="fr c2"><div><label>No. Invoice / Nota (Opsional)</label><input id="fInvNo" value="${d.invNo||''}" placeholder="INV-XXX / Nota-XXX"></div>
+      <div class="fr c2"><div><label>No. Invoice / Nota (Opsional)</label><input id="fInvNo" value="${esc(d.invNo||'')} " placeholder="INV-XXX / Nota-XXX"></div>
       <div><label>Status Pembayaran</label><select id="fPayStatus">
         <option value="lunas" ${d.payStatus!=='belum'?'selected':''}>Lunas</option>
         <option value="belum" ${d.payStatus==='belum'?'selected':''}>Belum Dibayar (jadi Hutang Supplier)</option>
@@ -1486,7 +1485,7 @@ function modal(){
       <div class="fr c2"><div><label>SKU Produk</label><select id="fSkRet"><option value="">— Pilih —</option>${skuOpts}</select></div>
       <div><label>Qty Retur</label><input id="fQt" type="number" value="${d.qty||1}" min="1"></div></div>
       <div class="fr c2"><div><label>Nilai Retur (Rp) — dipotong dari invoice terkait</label><input id="fNilai" type="number" value="${d.nilaiRetur||0}" min="0"></div>
-      <div><label>Alasan Retur</label><input id="fAlasan" value="${d.alasan||''}" placeholder="Barang rusak / salah kirim"></div></div>
+      <div><label>Alasan Retur</label><input id="fAlasan" value="${esc(d.alasan||'')} " placeholder="Barang rusak / salah kirim"></div></div>
       <div style="display:flex;align-items:center;gap:8px;padding:10px;background:#F5F6FA;border-radius:7px">
         <input type="checkbox" id="fStokMasuk" ${d.stokMasuk?'checked':''}><label for="fStokMasuk" style="margin:0;cursor:pointer">Konfirmasi pergerakan stok sekarang</label>
       </div>
@@ -1961,8 +1960,8 @@ function modal(){
     <div class="mb">
       <div class="fr c3">
         <div><label>Tanggal</label><input id="fTg" type="date" value="${d.tgl||today()}"></div>
-        <div><label>No. Referensi (Opsional)</label><input id="fNoRef" value="${d.noRef||''}" placeholder="KONV-001"></div>
-        <div><label>Catatan (Opsional)</label><input id="fCatatan" value="${d.catatan||''}" placeholder="Switch bracket karet → fixed"></div>
+        <div><label>No. Referensi (Opsional)</label><input id="fNoRef" value="${esc(d.noRef||'')} " placeholder="KONV-001"></div>
+        <div><label>Catatan (Opsional)</label><input id="fCatatan" value="${esc(d.catatan||'')} " placeholder="Switch bracket karet → fixed"></div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:4px">
         <div>
@@ -1994,10 +1993,10 @@ function modal(){
     <div class="mh"><h3>${d.id?'Edit Lokasi':'Tambah Lokasi'}</h3><button class="btn btn-ic" id="bCl"><i class="ti ti-x"></i></button></div>
     <div class="mb">
       <div class="fr c2">
-        <div><label>Nama Lokasi *</label><input id="fNm" value="${d.nama||''}" placeholder="Contoh: Gudang Jakarta"></div>
+        <div><label>Nama Lokasi *</label><input id="fNm" value="${esc(d.nama||'')} " placeholder="Contoh: Gudang Jakarta"></div>
         <div><label>Tipe</label><select id="fTipeLoc"><option value="Gudang" ${d.tipe==='Gudang'||!d.tipe?'selected':''}>Gudang</option><option value="Toko" ${d.tipe==='Toko'?'selected':''}>Toko</option><option value="Lainnya" ${d.tipe==='Lainnya'?'selected':''}>Lainnya</option></select></div>
       </div>
-      <div class="fr"><label>Catatan (Opsional)</label><input id="fCatatan" value="${d.catatan||''}" placeholder="Alamat, keterangan..."></div>
+      <div class="fr"><label>Catatan (Opsional)</label><input id="fCatatan" value="${esc(d.catatan||'')} " placeholder="Alamat, keterangan..."></div>
     </div>
     <div class="mf"><button class="btn" id="bCl2">Batal</button><button class="btn btn-p" id="bSvLoc" data-id="${d.id||''}">Simpan</button></div>
   </div></div>`;
@@ -2016,8 +2015,8 @@ function modal(){
     <div class="mb">
       <div class="fr c3">
         <div><label>Tanggal</label><input id="fTg" type="date" value="${d.tgl||today()}"></div>
-        <div><label>No. DO</label><input id="fNoDO" value="${d.noDO||''}" placeholder="DO-001"></div>
-        <div><label>Catatan</label><input id="fCatatan" value="${d.catatan||''}" placeholder="Tujuan / keterangan..."></div>
+        <div><label>No. DO</label><input id="fNoDO" value="${esc(d.noDO||'')} " placeholder="DO-001"></div>
+        <div><label>Catatan</label><input id="fCatatan" value="${esc(d.catatan||'')} " placeholder="Tujuan / keterangan..."></div>
       </div>
       <div class="fr c2">
         <div><label>Dari Lokasi *</label><select id="fFromLoc"><option value="">— Pilih —</option>${fromSel}</select></div>
@@ -2121,7 +2120,7 @@ function modal(){
     <div class="mb">
       <div class="fr c3">
         <div><label>Tanggal</label><input id="fTg" type="date" value="${d.tgl||today()}"></div>
-        <div><label>No. Invoice</label><input id="fIn" value="${d.inv||''}" placeholder="INV-001"></div>
+        <div><label>No. Invoice</label><input id="fIn" value="${esc(d.inv||'')} " placeholder="INV-001"></div>
         <div><label>Customer</label><select id="fCust"><option value="">— Pilih —</option>${custOpts}</select></div>
       </div>
       <div class="fr c2">
@@ -2191,15 +2190,36 @@ function skuLineBuy(it,idx){
 }
 function skuLineSell(it,idx){
   const opts=S.products.map(p=>`<option value="${p.sku}" ${it.sku===p.sku?'selected':''}>${p.sku} — ${p.nama}</option>`).join('');
-  return`<div class="sku-line" style="grid-template-columns:1fr 110px 80px 70px 100px 36px" data-idx="${idx}">
-    <select class="slSku"><option value="">— SKU —</option>${opts}</select>
-    <input class="slHj" type="number" value="${it.hjAsli!=null?it.hjAsli:(it.disc&&it.disc>0?Math.round(it.hj/(1-it.disc/100)):it.hj)||0}" placeholder="Harga Jual (sblm disc)">
-    <input class="slDc" type="number" value="${it.disc||0}" placeholder="Disc%" min="0" max="100">
-    <input class="slQt" type="number" value="${it.qty||1}" placeholder="Qty" min="1">
-    <input class="slTot" type="number" value="${it.total||0}" readonly style="background:#f5f6fa">
-    <button class="btn btn-ic btn-sm btn-d slRem"><i class="ti ti-minus"></i></button>
+  const hjDisplay=it.hjAsli!=null?it.hjAsli:(it.disc&&it.disc>0?Math.round(it.hj/(1-it.disc/100)):it.hj)||0;
+  const sizes=availableSizes();
+  const setTplOpts=SET_TYPES.map(t=>`<option value="${t.kode}" ${it.setTpl===t.kode?'selected':''}>${t.nama}</option>`).join('');
+  const sizeOpts=sizes.map(([k,l])=>`<option value="${k}" ${it.setSize===k?'selected':''}>${l}</option>`).join('');
+  const isSet=!!it.isSet;
+  return`<div class="sku-line" data-idx="${idx}" style="padding:10px;background:#FAFBFC;border:1px solid var(--bd);border-radius:7px;margin-bottom:6px">
+    <div style="margin-bottom:6px">
+      <label style="margin:0;font-size:11px;display:inline-flex;align-items:center;gap:5px;cursor:pointer;font-weight:400">
+        <input type="checkbox" class="slIsSet" ${isSet?'checked':''} style="width:auto"> Jual sebagai Set Kastor
+      </label>
+    </div>
+    <div class="slNormalRow" style="${isSet?'display:none;':''}display:grid;grid-template-columns:1fr 110px 80px 70px 100px 36px;gap:6px;align-items:center">
+      <select class="slSku"><option value="">— SKU —</option>${opts}</select>
+      <input class="slHj" type="number" value="${hjDisplay}" placeholder="Harga Jual">
+      <input class="slDc" type="number" value="${it.disc||0}" placeholder="Disc%" min="0" max="100">
+      <input class="slQt" type="number" value="${it.qty||1}" placeholder="Qty" min="1">
+      <input class="slTot" type="number" value="${it.total||0}" readonly style="background:#f5f6fa">
+      <button class="btn btn-ic btn-sm btn-d slRem"><i class="ti ti-minus"></i></button>
+    </div>
+    <div class="slSetRow" style="${isSet?'':'display:none;'}display:grid;grid-template-columns:1fr 1fr 90px 110px 36px;gap:6px;align-items:center">
+      <select class="slSetTpl"><option value="">— Template Set —</option>${setTplOpts}</select>
+      <select class="slSetSize"><option value="">— Ukuran —</option>${sizeOpts}</select>
+      <input class="slSetQty" type="number" value="${it.setQty||1}" placeholder="Qty set" min="1" title="Berapa set?">
+      <input class="slSetHarga" type="number" value="${it.setHarga||0}" placeholder="Harga/set">
+      <button class="btn btn-ic btn-sm btn-d slRem"><i class="ti ti-minus"></i></button>
+    </div>
+    <div class="slSetInfo" style="font-size:11px;color:var(--t2);margin-top:4px;padding:0 2px"></div>
   </div>`;
 }
+
 function calcSellSummary(items,fee,ongkir,ppnOn,ppnPct){
   const gross=items.reduce((a,i)=>a+(i.total||0),0);
   const ppnAktif=ppnOn==='yes'||ppnOn===true;
@@ -2241,16 +2261,43 @@ function collectBuy(){
   });
 }
 function collectSell(){
-  return [...document.querySelectorAll('#itemListSell .sku-line')].map(l=>{
-    const sku=l.querySelector('.slSku').value;
-    const hjAsli=parseFloat(l.querySelector('.slHj').value)||0;
-    const dc=parseFloat(l.querySelector('.slDc').value)||0;
-    const qty=parseFloat(l.querySelector('.slQt').value)||1;
-    const hjNet=hjAsli*(1-dc/100);
-    const p=S.products.find(x=>x.sku===sku);
-    const s=sku?stats(sku):{avg:0};
-    return{id:uid(),sku,nama:p?.nama||'',brand:p?.brand||'',hjAsli,hj:hjNet,disc:dc,qty,total:hjNet*qty,hpp:s.avg};
+  const result=[];
+  [...document.querySelectorAll('#itemListSell .sku-line')].forEach(l=>{
+    const isSet=l.querySelector('.slIsSet')?.checked||false;
+    if(isSet){
+      // expand set template into individual SKU rows
+      const tplKode=l.querySelector('.slSetTpl')?.value||'';
+      const sizeKode=l.querySelector('.slSetSize')?.value||'';
+      const qtySet=parseFloat(l.querySelector('.slSetQty')?.value)||1;
+      const hargaSet=parseFloat(l.querySelector('.slSetHarga')?.value)||0;
+      if(!tplKode||!sizeKode){
+        // incomplete set — skip (validation will catch)
+        result.push({id:uid(),sku:'',nama:'',brand:'',hjAsli:0,hj:0,disc:0,qty:1,total:0,hpp:0,isSet:true,setTpl:tplKode,setSize:sizeKode,setQty:qtySet,setHarga:hargaSet,_incomplete:true});
+        return;
+      }
+      const tpl=SET_TYPES.find(t=>t.kode===tplKode);
+      if(!tpl)return;
+      const hargaPerPcs=hargaSet/4; // 1 set = 4 pcs
+      tpl.komposisi.forEach(k=>{
+        const found=findSKUForSet(k.tipe,sizeKode);
+        if(!found.length)return;
+        const p=found[0];
+        const qtyPcs=k.qty*qtySet;
+        const s=stats(p.sku);
+        result.push({id:uid(),sku:p.sku,nama:p.nama,brand:p.brand||'',hjAsli:hargaPerPcs,hj:hargaPerPcs,disc:0,qty:qtyPcs,total:hargaPerPcs*qtyPcs,hpp:s.avg,_fromSet:tplKode,_setSize:sizeKode});
+      });
+    }else{
+      const sku=l.querySelector('.slSku')?.value||'';
+      const hjAsli=parseFloat(l.querySelector('.slHj')?.value)||0;
+      const dc=parseFloat(l.querySelector('.slDc')?.value)||0;
+      const qty=parseFloat(l.querySelector('.slQt')?.value)||1;
+      const hjNet=hjAsli*(1-dc/100);
+      const p=S.products.find(x=>x.sku===sku);
+      const s=sku?stats(sku):{avg:0};
+      result.push({id:uid(),sku,nama:p?.nama||'',brand:p?.brand||'',hjAsli,hj:hjNet,disc:dc,qty,total:hjNet*qty,hpp:s.avg});
+    }
   });
+  return result;
 }
 function updatePOTotal(){
   const items=collectPO();const curr=document.getElementById('fCurr')?.value||'IDR';
@@ -2613,7 +2660,6 @@ function bind(){
   document.getElementById('bImpSell')?.addEventListener('click',()=>{S.imp={mode:'sell'};S.modal={type:'import',data:{mode:'sell'}};render();bm();});
   document.getElementById('bAddPO')?.addEventListener('click',()=>{S.modal={type:'po',data:{}};render();bm();});
   document.getElementById('bAddBuy')?.addEventListener('click',()=>{S.modal={type:'buy',data:{}};render();bm();});
-  document.getElementById('bAddSet')?.addEventListener('click',()=>{S.modal={type:'sellSet',data:{}};render();bm();});
   document.getElementById('bAddSell')?.addEventListener('click',()=>{S.modal={type:'sell',data:{}};render();bm();});
   document.getElementById('bAddSup')?.addEventListener('click',()=>{S.modal={type:'sup',data:{}};render();bm();});
   document.getElementById('bAddCust')?.addEventListener('click',()=>{S.modal={type:'cust',data:{}};render();bm();});
@@ -2844,7 +2890,12 @@ function bm(){
     const payTerm=document.getElementById('fPt').value;
     const note=document.getElementById('fNote').value,items=collectPO();
     if(!tgl){alert('Tanggal wajib diisi');return;}
-    if(!items.length||items.some(i=>!i.sku)){alert('Lengkapi semua item SKU');return;}
+    const incompleteSet=items.find(i=>i._incomplete);
+    if(incompleteSet){alert('Ada baris Set Kastor yang belum lengkap — pilih template dan ukuran');return;}
+    const realItems=items.filter(i=>i.sku);
+    if(!realItems.length){alert('Lengkapi semua item SKU');return;}
+    // replace items with expanded set items
+    const finalItems=realItems;
     const rec={tgl,noPO,supId,status,curr,rate,payTerm,note,items};
     if(id){S.purchaseOrders=S.purchaseOrders.map(x=>x.id===id?{...x,...rec}:x);toast('PO diperbarui');}
     else{S.purchaseOrders.push({id:uid(),...rec});toast('PO dibuat');}
@@ -3298,12 +3349,49 @@ function bindSellItems(){
   [...list.children].forEach(l=>bindSellLine(l));
 }
 function bindSellLine(l){
+  // normal row handlers
   l.querySelectorAll('.slHj,.slDc,.slQt').forEach(el=>el.addEventListener('input',()=>{
-    const hj=parseFloat(l.querySelector('.slHj').value)||0,dc=parseFloat(l.querySelector('.slDc').value)||0,q=parseFloat(l.querySelector('.slQt').value)||1;
-    const hjn=hj*(1-dc/100);l.querySelector('.slTot').value=Math.round(hjn*q);updateSellSummary();
+    const hj=parseFloat(l.querySelector('.slHj')?.value)||0,dc=parseFloat(l.querySelector('.slDc')?.value)||0,q=parseFloat(l.querySelector('.slQt')?.value)||1;
+    const hjn=hj*(1-dc/100);const tot=l.querySelector('.slTot');if(tot)tot.value=Math.round(hjn*q);updateSellSummary();
   }));
   l.querySelector('.slSku')?.addEventListener('change',updateSellSummary);
   l.querySelector('.slRem')?.addEventListener('click',()=>{l.remove();updateSellSummary();});
+  // set row handlers
+  const isSetCb=l.querySelector('.slIsSet');
+  const normalRow=l.querySelector('.slNormalRow');
+  const setRow=l.querySelector('.slSetRow');
+  const setInfo=l.querySelector('.slSetInfo');
+  const updateSetInfo=()=>{
+    if(!isSetCb?.checked)return;
+    const tplKode=l.querySelector('.slSetTpl')?.value||'';
+    const sizeKode=l.querySelector('.slSetSize')?.value||'';
+    const qtySet=parseFloat(l.querySelector('.slSetQty')?.value)||1;
+    const hargaSet=parseFloat(l.querySelector('.slSetHarga')?.value)||0;
+    if(!tplKode||!sizeKode){if(setInfo)setInfo.innerHTML='Pilih template dan ukuran';return;}
+    const tpl=SET_TYPES.find(t=>t.kode===tplKode);
+    if(!tpl){if(setInfo)setInfo.innerHTML='';return;}
+    const lines=tpl.komposisi.map(k=>{
+      const found=findSKUForSet(k.tipe,sizeKode);
+      const qtyPcs=k.qty*qtySet;
+      if(!found.length)return`<span style="color:var(--err)">✗ ${BRACKET_NAMES[k.tipe]} ${qtyPcs}pcs — SKU tidak ditemukan</span>`;
+      const p=found[0];const s=stats(p.sku);
+      const clr=s.stokBagus<qtyPcs?'var(--err)':'var(--ok)';
+      return`<span style="color:${clr}">✓ ${p.sku} ×${qtyPcs}pcs (stok:${fmt(s.stokBagus)})</span>`;
+    });
+    if(setInfo)setInfo.innerHTML=lines.join('  &nbsp;|&nbsp;  ');
+    updateSellSummary();
+  };
+  isSetCb?.addEventListener('change',()=>{
+    const on=isSetCb.checked;
+    if(normalRow)normalRow.style.display=on?'none':'grid';
+    if(setRow)setRow.style.display=on?'grid':'none';
+    if(setInfo)setInfo.innerHTML='';
+    updateSellSummary();
+  });
+  l.querySelectorAll('.slSetTpl,.slSetSize,.slSetQty,.slSetHarga').forEach(el=>{
+    el.addEventListener('change',updateSetInfo);
+    el.addEventListener('input',updateSetInfo);
+  });
   updateSellSummary();
 }
 
