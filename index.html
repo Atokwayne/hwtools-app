@@ -1751,11 +1751,21 @@ function modal(){
         <div><div class="tm" style="margin-bottom:3px">Channel</div><strong>${s.ch||'—'}</strong></div>
       </div>
       <div class="tw" style="margin-bottom:14px"><table>
-        <thead><tr><th>SKU</th><th>Nama Barang</th><th class="rt">Harga</th><th class="rt">Qty</th><th class="rt">Total</th></tr></thead>
-        <tbody>${(s.items||[]).map(i=>`<tr>
-          <td><span class="chip">${i.sku}</span></td><td>${i.nama||'—'}</td>
-          <td class="rt">${rp(i.hj)}</td><td class="rt">${fmt(i.qty)}</td><td class="rt">${rp(i.total)}</td>
-        </tr>`).join('')}</tbody>
+        <thead><tr><th>Set/Label</th><th>SKU</th><th>Nama Barang</th><th class="rt">Sat.</th><th class="rt">Qty</th><th class="rt">Harga</th><th class="rt">Total</th></tr></thead>
+        <tbody>${(()=>{
+          const _items=s.items||[];
+          const _setG={};const _normI=[];
+          _items.forEach(it=>{if(it._fromSet&&it._setLabel){const k=it._setLabel+'__'+(it._setQty||1);
+            if(!_setG[k])_setG[k]={label:it._setLabel,qty:it._setQty||1,harga:it._setHarga||0,items:[]};
+            _setG[k].items.push(it);}else _normI.push(it);});
+          let _r='';
+          Object.values(_setG).forEach(g=>{
+            _r+=`<tr style="background:var(--accl);font-weight:600"><td>${g.label}</td><td colspan="3"></td><td class="rt">×${g.qty} set</td><td class="rt"></td><td class="rt">${rp(g.harga*g.qty)}</td></tr>`;
+            g.items.forEach(it=>{_r+=`<tr style="background:#f8fafc"><td class="tm" style="font-size:10px;padding-left:12px">↳ komponen</td><td><span class="chip" style="font-size:10px">${it.sku}</span></td><td class="tm" style="font-size:11px">${it.nama||'—'}</td><td class="rt tm">pcs</td><td class="rt">${fmt(it.qty)}</td><td class="rt tm">—</td><td class="rt tm">—</td></tr>`;});
+          });
+          _normI.forEach(i=>{_r+=`<tr><td>pcs</td><td><span class="chip">${i.sku}</span></td><td>${i.nama||'—'}</td><td class="rt">pcs</td><td class="rt">${fmt(i.qty)}</td><td class="rt">${rp(i.hj)}</td><td class="rt">${rp(i.total)}</td></tr>`;});
+          return _r;
+        })()}</tbody>
       </table></div>
       <div class="sb">
         <div class="row"><span>Subtotal Barang</span><span>${rp(pr.gross)}</span></div>
@@ -2195,6 +2205,37 @@ function skuLineSell(it,idx){
   const setTplOpts=SET_TYPES.map(t=>`<option value="${t.kode}" ${it.setTpl===t.kode?'selected':''}>${t.nama}</option>`).join('');
   const sizeOpts=sizes.map(([k,l])=>`<option value="${k}" ${it.setSize===k?'selected':''}>${l}</option>`).join('');
   const isSet=!!it.isSet;
+  // Build komposisi picker inline (rendered server-side in template)
+  let kompHtml='';
+  if(isSet&&it.setTpl&&it.setSize){
+    const tpl=SET_TYPES.find(t=>t.kode===it.setTpl);
+    const qtySet=it.setQty||1;
+    if(tpl){
+      const rows=tpl.komposisi.map((k,ki)=>{
+        const found=findSKUForSet(k.tipe,it.setSize);
+        const qtyPcs=k.qty*qtySet;
+        const selVal=(it.kompSkus&&it.kompSkus[ki])||found[0]?.sku||'';
+        const opts2=found.map(p=>{
+          const s=stats(p.sku);
+          const clr=s.stokBagus<qtyPcs?'color:var(--err)':'';
+          return`<option value="${p.sku}" style="${clr}" ${selVal===p.sku?'selected':''}>${p.sku} — ${p.nama} (stok: ${fmt(s.stokBagus)})</option>`;
+        }).join('');
+        const selStok=selVal?stats(selVal):{stokBagus:0};
+        const stokClr=selStok.stokBagus<qtyPcs?'var(--err)':'var(--ok)';
+        return`<div style="display:grid;grid-template-columns:180px 1fr 90px;gap:8px;align-items:center;margin-bottom:6px">
+          <div><span class="bdg ${k.tipe==='SB'?'bo':k.tipe==='F'?'bx':'bb'}">${BRACKET_NAMES[k.tipe]}</span> <span class="tm" style="font-size:10px">×${qtyPcs}pcs</span></div>
+          ${found.length?`<select class="kompSkuSel" data-ki="${ki}" data-idx="${idx}">${opts2}</select>`:`<span style="color:var(--err);font-size:11px">✗ Tidak ada SKU -${k.tipe} ukuran ${SIZE_MAP[it.setSize]||it.setSize}</span>`}
+          <span class="kompStokInfo" style="font-size:11px;color:${stokClr}">${selVal?fmt(selStok.stokBagus)+' pcs':''}</span>
+        </div>`;
+      }).join('');
+      kompHtml=`<div style="background:#fff;border:1px solid var(--bd);border-radius:7px;padding:10px;margin-top:8px">
+        <div style="font-size:11px;font-weight:700;color:var(--t2);margin-bottom:8px">PILIH SKU PER KOMPONEN <span style="font-weight:400;color:var(--t3)">(filter: tipe + ${SIZE_MAP[it.setSize]} — pilih bahan roda)</span></div>
+        ${rows}
+      </div>`;
+    }
+  }else if(isSet&&(!it.setTpl||!it.setSize)){
+    kompHtml=`<div style="font-size:11px;color:var(--t3);margin-top:6px;padding:4px 8px;">← Pilih template dan ukuran untuk memunculkan pilihan SKU</div>`;
+  }
   return`<div class="sku-line" data-idx="${idx}" style="padding:10px;background:#FAFBFC;border:1px solid var(--bd);border-radius:7px;margin-bottom:6px">
     <div style="margin-bottom:6px">
       <label style="margin:0;font-size:11px;display:inline-flex;align-items:center;gap:5px;cursor:pointer;font-weight:400">
@@ -2210,18 +2251,15 @@ function skuLineSell(it,idx){
       <button class="btn btn-ic btn-sm btn-d slRem"><i class="ti ti-minus"></i></button>
     </div>
     <div class="slSetRow" style="${isSet?'':'display:none;'}">
-      <div style="display:grid;grid-template-columns:1fr 1fr 90px 110px 36px;gap:6px;align-items:center;margin-bottom:6px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 90px 110px 36px;gap:6px;align-items:center">
         <select class="slSetTpl"><option value="">— Template Set —</option>${setTplOpts}</select>
         <select class="slSetSize"><option value="">— Ukuran —</option>${sizeOpts}</select>
-        <input class="slSetQty" type="number" value="${it.setQty||1}" placeholder="Qty set" min="1" title="Berapa set?">
-        <input class="slSetHarga" type="number" value="${it.setHarga||0}" placeholder="Harga/set (Rp)">
+        <input class="slSetQty" type="number" value="${it.setQty||1}" placeholder="Qty set" min="1">
+        <input class="slSetHarga" type="number" value="${it.setHarga||0}" placeholder="Harga/set">
         <button class="btn btn-ic btn-sm btn-d slRem"><i class="ti ti-minus"></i></button>
       </div>
-      <div class="slSetKomposisi" style="display:none;background:#fff;border:1px solid var(--bd);border-radius:7px;padding:10px;margin-top:4px">
-        <div style="font-size:11px;font-weight:700;color:var(--t2);margin-bottom:8px">PILIH SKU PER KOMPONEN <span style="font-weight:400">(difilter berdasarkan tipe + ukuran)</span></div>
-      </div>
+      ${kompHtml}
     </div>
-    <div class="slSetInfo" style="font-size:11px;color:var(--t2);margin-top:4px;padding:0 2px"></div>
   </div>`;
 }
 
@@ -2270,28 +2308,35 @@ function collectSell(){
   [...document.querySelectorAll('#itemListSell .sku-line')].forEach(l=>{
     const isSet=l.querySelector('.slIsSet')?.checked||false;
     if(isSet){
-      // expand set template into individual SKU rows
       const tplKode=l.querySelector('.slSetTpl')?.value||'';
       const sizeKode=l.querySelector('.slSetSize')?.value||'';
       const qtySet=parseFloat(l.querySelector('.slSetQty')?.value)||1;
       const hargaSet=parseFloat(l.querySelector('.slSetHarga')?.value)||0;
       if(!tplKode||!sizeKode){
-        // incomplete set — skip (validation will catch)
-        result.push({id:uid(),sku:'',nama:'',brand:'',hjAsli:0,hj:0,disc:0,qty:1,total:0,hpp:0,isSet:true,setTpl:tplKode,setSize:sizeKode,setQty:qtySet,setHarga:hargaSet,_incomplete:true});
+        // mark as incomplete
+        result.push({id:uid(),sku:'',nama:'',brand:'',hjAsli:0,hj:0,disc:0,qty:1,total:0,hpp:0,
+          isSet:true,setTpl:tplKode,setSize:sizeKode,setQty:qtySet,setHarga:hargaSet,_incomplete:true});
         return;
       }
       const tpl=SET_TYPES.find(t=>t.kode===tplKode);
       if(!tpl)return;
-      const hargaPerPcs=hargaSet/4; // 1 set = 4 pcs
+      const hargaPerPcs=hargaSet/4;
+      // read selected SKU per komponen from rendered DOM
       const kompSels=[...l.querySelectorAll('.kompSkuSel')];
       tpl.komposisi.forEach((k,ki)=>{
         const selSkuVal=kompSels[ki]?.value||'';
-        const found=selSkuVal?[S.products.find(x=>x.sku===selSkuVal)].filter(Boolean):findSKUForSet(k.tipe,sizeKode);
+        const found=selSkuVal
+          ?[S.products.find(x=>x.sku===selSkuVal)].filter(Boolean)
+          :findSKUForSet(k.tipe,sizeKode);
         if(!found.length||!found[0])return;
         const p=found[0];
         const qtyPcs=k.qty*qtySet;
         const s=stats(p.sku);
-        result.push({id:uid(),sku:p.sku,nama:p.nama,brand:p.brand||'',hjAsli:hargaPerPcs,hj:hargaPerPcs,disc:0,qty:qtyPcs,total:hargaPerPcs*qtyPcs,hpp:s.avg,_fromSet:tplKode,_setSize:sizeKode});
+        result.push({id:uid(),sku:p.sku,nama:p.nama,brand:p.brand||'',
+          hjAsli:hargaPerPcs,hj:hargaPerPcs,disc:0,qty:qtyPcs,
+          total:hargaPerPcs*qtyPcs,hpp:s.avg,
+          _fromSet:tplKode,_setLabel:'Set '+tplKode+' '+SIZE_MAP[sizeKode],
+          _setHarga:hargaSet,_setQty:qtySet,_setSize:sizeKode});
       });
     }else{
       const sku=l.querySelector('.slSku')?.value||'';
@@ -2301,11 +2346,13 @@ function collectSell(){
       const hjNet=hjAsli*(1-dc/100);
       const p=S.products.find(x=>x.sku===sku);
       const s=sku?stats(sku):{avg:0};
-      result.push({id:uid(),sku,nama:p?.nama||'',brand:p?.brand||'',hjAsli,hj:hjNet,disc:dc,qty,total:hjNet*qty,hpp:s.avg});
+      result.push({id:uid(),sku,nama:p?.nama||'',brand:p?.brand||'',
+        hjAsli,hj:hjNet,disc:dc,qty,total:hjNet*qty,hpp:s.avg});
     }
   });
   return result;
 }
+
 function updatePOTotal(){
   const items=collectPO();const curr=document.getElementById('fCurr')?.value||'IDR';
   const rate=parseFloat(document.getElementById('fRate')?.value)||1;
@@ -2420,27 +2467,95 @@ function exportPOxls(po){
   XLSX.utils.book_append_sheet(wb,ws,'PO');XLSX.writeFile(wb,`PO_${po.noPO||po.id}.xlsx`);
 }
 function exportInvoicePdf(sale){
-  const {jsPDF}=window.jspdf;const doc=new jsPDF();
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const W=297,ML=14,MR=14;
   const cust=S.customers.find(c=>c.id===sale.custId);
   const pr=saleProfit(sale);
-  doc.setFontSize(18);doc.text('INVOICE PENJUALAN',14,20);
-  doc.setFontSize(10);
-  doc.text(`No. Invoice: ${sale.inv||'-'}`,14,30);
-  doc.text(`Tanggal: ${fd(sale.tgl)}`,14,36);
-  doc.text(`Customer: ${cust?cust.nama:'-'}`,14,42);
-  doc.text(`Channel: ${sale.ch||'-'}`,14,48);
-  const rows=(sale.items||[]).map((i,n)=>[n+1,i.sku,i.nama,fmt(i.qty),rp(i.hj),i.disc?i.disc+'%':'-',rp(i.total)]);
-  doc.autoTable({startY:54,head:[['No','SKU','Nama Barang','Qty','Harga','Disc','Total']],body:rows,theme:'grid',headStyles:{fillColor:[24,95,165]}});
+  const paid=(sale.payments||[]).reduce((a,p)=>a+(p.amountIDR||p.amount),0);
+  // header
+  doc.setFontSize(18);doc.setFont(undefined,'bold');doc.text('INVOICE PENJUALAN',ML,18);
+  doc.setFontSize(10);doc.setFont(undefined,'normal');
+  // info box kanan
+  const infoX=W-MR-75;
+  doc.setDrawColor(200);doc.rect(infoX,10,75,28);
+  const iRow=(lbl,val,y)=>{doc.setFont(undefined,'bold');doc.text(lbl,infoX+2,y);doc.setFont(undefined,'normal');doc.text(String(val),infoX+28,y);};
+  iRow('No. Invoice:',sale.inv||'-',16);
+  iRow('Tanggal:',fd(sale.tgl),22);
+  iRow('Customer:',cust?cust.nama:'-',28);
+  iRow('Channel:',sale.ch||'-',34);
+  // group items: set items grouped by _setLabel, individual items normal
+  const items=sale.items||[];
+  const setGroups={};const normalItems=[];
+  items.forEach(it=>{
+    if(it._fromSet&&it._setLabel){
+      const key=it._setLabel+'__'+it._setQty;
+      if(!setGroups[key])setGroups[key]={label:it._setLabel,qty:it._setQty||1,hargaSet:it._setHarga||0,items:[]};
+      setGroups[key].items.push(it);
+    }else normalItems.push(it);
+  });
+  // build table rows
+  const rows=[];
+  let rowNum=1;
+  // set groups first
+  Object.values(setGroups).forEach(g=>{
+    // header row for set
+    rows.push([rowNum++,g.label,'','','Set','×'+g.qty+' set','',fmt(g.hargaSet*g.qty)]);
+    // sub-rows
+    g.items.forEach(it=>{
+      rows.push(['','',it.sku,it.nama,'','','×'+fmt(it.qty)+' pcs','']);
+    });
+  });
+  // normal items
+  normalItems.forEach(it=>{
+    rows.push([rowNum++,'',it.sku,it.nama,'pcs',fmt(it.qty),rp(it.hj),rp(it.total)]);
+  });
+  doc.autoTable({
+    startY:42,
+    head:[['No','Set/Label','SKU','Nama Barang','Satuan','Qty','Harga','Total']],
+    body:rows,
+    theme:'grid',
+    headStyles:{fillColor:[24,95,165],fontSize:9},
+    bodyStyles:{fontSize:9},
+    columnStyles:{
+      0:{cellWidth:10},1:{cellWidth:35},2:{cellWidth:28},3:{cellWidth:70},
+      4:{cellWidth:16,halign:'center'},5:{cellWidth:18,halign:'center'},
+      6:{cellWidth:30,halign:'right'},7:{cellWidth:32,halign:'right'}
+    },
+    didParseCell:function(d){
+      // gray background for set header rows
+      if(d.row.raw&&d.row.raw[1]&&!d.row.raw[2]&&d.row.index>0){
+        d.cell.styles.fillColor=[240,245,255];d.cell.styles.fontStyle='bold';
+      }
+      // indent sub-rows
+      if(d.row.raw&&!d.row.raw[0]&&d.row.raw[2]){
+        d.cell.styles.fillColor=[248,250,252];
+        if(d.column.index===2)d.cell.styles.cellPadding={left:8,top:2,right:2,bottom:2};
+      }
+    }
+  });
   let y=doc.lastAutoTable.finalY+8;
+  // totals
+  const tlbl=(t,v,yy,bold)=>{
+    if(bold)doc.setFont(undefined,'bold');else doc.setFont(undefined,'normal');
+    doc.text(t,W-MR-70,yy);doc.text(v,W-MR,yy,{align:'right'});
+  };
   doc.setFontSize(10);
-  const lbl=(t,v,yy)=>{doc.text(t,130,yy);doc.text(v,196,yy,{align:'right'});};
-  lbl('Subtotal Barang:',rp(pr.gross),y);y+=6;
-  if(pr.fee>0){lbl('Fee Marketplace:',rp(pr.fee),y);y+=6;}
-  if(pr.ongkir>0){lbl('Biaya Kirim:',rp(pr.ongkir),y);y+=6;}
-  if(pr.ppnAktif){lbl(`PPN ${sale.ppnPct||11}% (sudah termasuk):`,rp(pr.ppn),y);y+=6;lbl('Neto sebelum PPN:',rp(pr.netoSebelumPPN),y);y+=6;}
-  doc.setFont(undefined,'bold');lbl('TOTAL NETO:',rp(pr.neto),y);doc.setFont(undefined,'normal');
-  doc.save(`Invoice_${sale.inv||sale.id}.pdf`);
+  tlbl('Subtotal:',rp(pr.gross),y);y+=6;
+  if(pr.fee>0){tlbl('Fee Marketplace:','- '+rp(pr.fee),y);y+=6;}
+  if(pr.ongkir>0){tlbl('Biaya Kirim:',rp(pr.ongkir),y);y+=6;}
+  if(pr.retur>0){tlbl('Retur:','- '+rp(pr.retur),y);y+=6;}
+  if(pr.ppnAktif){tlbl('PPN '+sale.ppnPct+'% (termasuk):',rp(pr.ppn),y);y+=6;}
+  doc.setFont(undefined,'bold');doc.setFontSize(11);
+  tlbl('TOTAL NETO:',rp(pr.neto),y,true);y+=8;
+  doc.setFont(undefined,'normal');doc.setFontSize(9);
+  tlbl('Sudah Dibayar:',rp(paid),y);y+=6;
+  const sisa=Math.max(0,pr.neto-paid);
+  if(sisa>0){doc.setFont(undefined,'bold');tlbl('Sisa:',rp(sisa),y,true);}
+  else{doc.setTextColor(0,120,0);tlbl('Status: LUNAS','',y);doc.setTextColor(0,0,0);}
+  doc.save('Invoice_'+(sale.inv||sale.id)+'.pdf');
 }
+
 function exportInvoiceXls(sale){
   const cust=S.customers.find(c=>c.id===sale.custId);
   const pr=saleProfit(sale);
@@ -2625,6 +2740,23 @@ function impCommitSell(parsed){
 
 // ═══ EVENT BINDINGS ═══
 function bind(){
+  // ── EVENT DELEGATION (works for dynamically rendered elements) ──────────────
+  // Only attach once — check if already attached via flag
+  if(!document._hwDelegated){
+    document._hwDelegated=true;
+    document.addEventListener('click',function(e){
+      const vb=e.target.closest('[data-viewbuy]');
+      if(vb){e.stopPropagation();S.modal={type:'viewBuy',data:{id:vb.dataset.viewbuy}};render();bm();return;}
+      const vs=e.target.closest('[data-viewsale]');
+      if(vs){e.stopPropagation();S.modal={type:'viewSale',data:{id:vs.dataset.viewsale}};render();bm();return;}
+      const nb=e.target.closest('[data-navbrand]');
+      if(nb){e.stopPropagation();S.modal=null;S.page='rekap';S.fb=nb.dataset.navbrand;S.q='';render();return;}
+      const vpo=e.target.closest('[data-viewpo]');
+      if(vpo){e.stopPropagation();S.modal={type:'viewPO',data:{id:vpo.dataset.viewpo}};render();bm();return;}
+      const vdo=e.target.closest('[data-viewdo]');
+      if(vdo){e.stopPropagation();S.modal={type:'viewDO',data:{id:vdo.dataset.viewdo}};render();bm();return;}
+    });
+  }
   document.querySelectorAll('[data-nav]').forEach(el=>el.addEventListener('click',()=>{S.page=el.dataset.nav;S.q='';S.fb='';render();}));
   // debounced search — prevents hang, restores focus
   let _sTimer=null;
@@ -2655,12 +2787,7 @@ function bind(){
     else{S.sortBy=el.dataset.sort;S.sortDir='asc';}render();
   }));
   // view invoice
-  document.querySelectorAll('[data-viewsale]').forEach(el=>{
-    const neo=el.cloneNode(true);el.parentNode?.replaceChild(neo,el);
-    neo.addEventListener('click',e=>{e.stopPropagation();
-      S.modal={type:'viewSale',data:{id:neo.dataset.viewsale}};render();bm();
-    });
-  });
+  // viewsale handled by document delegation above
   document.getElementById('sFp')?.addEventListener('change',e=>{S.fp=e.target.value;render();});
   document.getElementById('sFy')?.addEventListener('change',e=>{S.fy=parseInt(e.target.value);render();});
   document.getElementById('sFm')?.addEventListener('change',e=>{S.fm=parseInt(e.target.value);render();});
@@ -2684,7 +2811,7 @@ function bind(){
   // DO
   document.getElementById('bAddDO')?.addEventListener('click',()=>{S.modal={type:'do',data:{}};render();bm();});
   document.querySelectorAll('[data-pdfdo]').forEach(el=>el.addEventListener('click',()=>{exportDOpdf(el.dataset.pdfdo);}));
-  document.querySelectorAll('[data-viewdo]').forEach(el=>el.addEventListener('click',()=>{S.modal={type:'viewDO',data:{id:el.dataset.viewdo}};render();bm();}));
+  // viewdo handled by document delegation above
   document.querySelectorAll('[data-edo]').forEach(el=>el.addEventListener('click',()=>{const d=S.deliveryOrders.find(x=>x.id===el.dataset.edo);if(d){S.modal={type:'do',data:{...d}};render();bm();}}));
   document.querySelectorAll('[data-senddo]').forEach(el=>el.addEventListener('click',()=>{if(!confirm('Kirim DO ini ke tujuan? Status akan berubah ke Dikirim.'))return;S.deliveryOrders=S.deliveryOrders.map(x=>x.id===el.dataset.senddo?{...x,status:'sent'}:x);save();render();toast('DO dikirim');}));
   document.querySelectorAll('[data-confirmdo]').forEach(el=>el.addEventListener('click',()=>{if(!confirm('Konfirmasi terima barang? Stok akan bergerak ke lokasi tujuan.'))return;S.deliveryOrders=S.deliveryOrders.map(x=>x.id===el.dataset.confirmdo?{...x,status:'confirmed',confirmedTgl:today()}:x);save();render();toast('DO dikonfirmasi — stok telah bergerak');}));
@@ -2696,11 +2823,7 @@ function bind(){
     {S.stockConversions=S.stockConversions.filter(x=>x.id!==el.dataset.dkonv);save();render();}
   }));
   document.getElementById('bExpLR')?.addEventListener('click',exportLRxls);
-  document.querySelectorAll('[data-navbrand]').forEach(el=>el.addEventListener('click',e=>{
-    e.stopPropagation();
-    const brand=el.dataset.navbrand;
-    S.modal=null;S.page='rekap';S.fb=brand;S.q='';render();
-  }));
+  // navbrand handled by document delegation above
   document.querySelectorAll('[data-dash]').forEach(el=>el.addEventListener('click',()=>{
     S.modal={type:'dashDetail',data:{key:el.dataset.dash}};render();bm();
   }));
@@ -2980,9 +3103,7 @@ function bm(){
       S.modal={type:'viewBuy',data:{id:neo.dataset.viewbuy}};render();bm();
     });
   });
-  document.querySelectorAll('[data-viewpo]').forEach(el=>el.addEventListener('click',()=>{
-    S.modal={type:'viewPO',data:{id:el.dataset.viewpo}};render();bm();
-  }));
+  // viewpo handled by document delegation above
   document.querySelectorAll('[data-delpay]').forEach(el=>el.addEventListener('click',()=>{
     if(!confirm('Hapus cicilan ini?'))return;
     const sid=el.dataset.saleid;
@@ -3368,6 +3489,31 @@ function bindSellItems(){
   [...list.children].forEach(l=>bindSellLine(l));
 }
 function bindSellLine(l){
+  // helper: collect current set state from this line
+  const _getSetState=()=>({
+    isSet:l.querySelector('.slIsSet')?.checked||false,
+    setTpl:l.querySelector('.slSetTpl')?.value||'',
+    setSize:l.querySelector('.slSetSize')?.value||'',
+    setQty:parseFloat(l.querySelector('.slSetQty')?.value)||1,
+    setHarga:parseFloat(l.querySelector('.slSetHarga')?.value)||0,
+    kompSkus:[...l.querySelectorAll('.kompSkuSel')].reduce((a,s)=>{a[parseInt(s.dataset.ki)]=s.value;return a;},{}),
+    sku:l.querySelector('.slSku')?.value||'',
+    hj:parseFloat(l.querySelector('.slHj')?.value)||0,
+    disc:parseFloat(l.querySelector('.slDc')?.value)||0,
+    qty:parseFloat(l.querySelector('.slQt')?.value)||1,
+    hjAsli:parseFloat(l.querySelector('.slHj')?.value)||0,
+  });
+  // helper: re-render this line in place (preserving state)
+  const _reRenderLine=()=>{
+    const st=_getSetState();
+    const idx2=parseInt(l.dataset.idx);
+    const newHtml=skuLineSell({...st,isSet:st.isSet,total:0},idx2);
+    const tmp=document.createElement('div');tmp.innerHTML=newHtml;
+    const newLine=tmp.firstElementChild;
+    l.parentNode?.replaceChild(newLine,l);
+    bindSellLine(newLine);
+    updateSellSummary();
+  };
   // normal row handlers
   l.querySelectorAll('.slHj,.slDc,.slQt').forEach(el=>el.addEventListener('input',()=>{
     const hj=parseFloat(l.querySelector('.slHj')?.value)||0,dc=parseFloat(l.querySelector('.slDc')?.value)||0,q=parseFloat(l.querySelector('.slQt')?.value)||1;
@@ -3375,69 +3521,33 @@ function bindSellLine(l){
   }));
   l.querySelector('.slSku')?.addEventListener('change',updateSellSummary);
   l.querySelector('.slRem')?.addEventListener('click',()=>{l.remove();updateSellSummary();});
-  // set row handlers
-  const isSetCb=l.querySelector('.slIsSet');
-  const normalRow=l.querySelector('.slNormalRow');
-  const setRow=l.querySelector('.slSetRow');
-  const setInfo=l.querySelector('.slSetInfo');
-  const _buildKomposisi=()=>{
-    const komp=l.querySelector('.slSetKomposisi');if(!komp)return;
-    const tplKode=l.querySelector('.slSetTpl')?.value||'';
-    const sizeKode=l.querySelector('.slSetSize')?.value||'';
-    const qtySet=parseFloat(l.querySelector('.slSetQty')?.value)||1;
-    if(!tplKode||!sizeKode){komp.style.display='none';if(setInfo)setInfo.innerHTML='Pilih template dan ukuran dulu';return;}
-    const tpl=SET_TYPES.find(t=>t.kode===tplKode);
-    if(!tpl){komp.style.display='none';return;}
-    komp.style.display='block';
-    // build picker per komponen
-    const rows=tpl.komposisi.map((k,ki)=>{
-      const found=findSKUForSet(k.tipe,sizeKode);
-      const qtyPcs=k.qty*qtySet;
-      const selId='kompSku_'+ki+'_'+idx;
-      const curVal=komp.querySelectorAll('.kompSkuSel')[ki]?.value||'';
-      const opts=found.map(p=>{
-        const s=stats(p.sku);
-        const clr=s.stokBagus<qtyPcs?'color:var(--err)':'';
-        return`<option value="${p.sku}" style="${clr}" ${(curVal||found[0]?.sku)===p.sku?'selected':''}>${p.sku} — ${p.nama} (stok: ${fmt(s.stokBagus)})</option>`;
-      }).join('');
-      if(!found.length)return`<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span class="bdg bo">${BRACKET_NAMES[k.tipe]} ×${qtyPcs}pcs</span><span style="color:var(--err);font-size:11px">✗ SKU tidak ditemukan — tambah produk dengan suffix -${k.tipe} dan kode ${sizeKode}</span></div>`;
-      return`<div style="display:grid;grid-template-columns:160px 1fr 80px;gap:8px;align-items:center;margin-bottom:6px">
-        <div><span class="bdg ${k.tipe==='SB'?'bo':k.tipe==='F'?'bx':'bb'}">${BRACKET_NAMES[k.tipe]}</span><span class="tm" style="font-size:10px;margin-left:4px">×${qtyPcs}pcs</span></div>
-        <select class="kompSkuSel" data-ki="${ki}">${opts}</select>
-        <span id="${selId}Stok" style="font-size:11px"></span>
-      </div>`;
+  // set toggle
+  l.querySelector('.slIsSet')?.addEventListener('change',_reRenderLine);
+  // set config changes → re-render to show/update komponen picker
+  l.querySelector('.slSetTpl')?.addEventListener('change',_reRenderLine);
+  l.querySelector('.slSetSize')?.addEventListener('change',_reRenderLine);
+  l.querySelector('.slSetQty')?.addEventListener('change',_reRenderLine);
+  l.querySelector('.slSetQty')?.addEventListener('input',_reRenderLine);
+  // komponen SKU selection → update stok info (no re-render needed)
+  l.querySelectorAll('.kompSkuSel').forEach(sel=>{
+    sel.addEventListener('change',()=>{
+      const ki=parseInt(sel.dataset.ki);
+      const tpl=SET_TYPES.find(t=>t.kode===l.querySelector('.slSetTpl')?.value);
+      const k=tpl?.komposisi[ki];
+      const qtySet=parseFloat(l.querySelector('.slSetQty')?.value)||1;
+      const qtyPcs=k?k.qty*qtySet:0;
+      const s=stats(sel.value);
+      const clr=s.stokBagus<qtyPcs?'var(--err)':'var(--ok)';
+      const infoEl=sel.parentElement?.nextElementSibling;
+      if(infoEl&&infoEl.classList.contains('kompStokInfo')){
+        infoEl.textContent=fmt(s.stokBagus)+' pcs';
+        infoEl.style.color=clr;
+      }
+      updateSellSummary();
     });
-    komp.innerHTML='<div style="font-size:11px;font-weight:700;color:var(--t2);margin-bottom:8px">PILIH SKU PER KOMPONEN <span style="font-weight:400">(difilter: '+BRACKET_NAMES[tpl.komposisi[0]?.tipe]+' + ukuran '+SIZE_MAP[sizeKode]+' — pilih bahan roda)</span></div>'+rows.join('');
-    // wire stok update per komponen select
-    komp.querySelectorAll('.kompSkuSel').forEach(sel=>{
-      const ki=parseInt(sel.dataset.ki);const k=tpl.komposisi[ki];
-      const _upd=()=>{
-        const sku=sel.value;if(!sku)return;
-        const qtyPcs=k.qty*qtySet;const s=stats(sku);
-        const clr=s.stokBagus<qtyPcs?'var(--err)':'var(--ok)';
-        const stokEl=sel.parentElement?.querySelector('[id$="Stok"]');
-        if(stokEl)stokEl.innerHTML=`<span style="color:${clr}">stok:${fmt(s.stokBagus)}</span>`;
-        updateSellSummary();
-      };
-      sel.addEventListener('change',_upd);setTimeout(_upd,10);
-    });
-  };
-  const updateSetInfo=()=>{
-    if(!isSetCb?.checked)return;
-    _buildKomposisi();
-    updateSellSummary();
-  };
-  isSetCb?.addEventListener('change',()=>{
-    const on=isSetCb.checked;
-    if(normalRow)normalRow.style.display=on?'none':'grid';
-    if(setRow)setRow.style.display=on?'grid':'none';
-    if(setInfo)setInfo.innerHTML='';
-    updateSellSummary();
   });
-  l.querySelectorAll('.slSetTpl,.slSetSize,.slSetQty,.slSetHarga').forEach(el=>{
-    el.addEventListener('change',updateSetInfo);
-    el.addEventListener('input',updateSetInfo);
-  });
+  // set harga change → summary only
+  l.querySelector('.slSetHarga')?.addEventListener('input',updateSellSummary);
   updateSellSummary();
 }
 
